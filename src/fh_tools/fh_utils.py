@@ -24,7 +24,7 @@ PATTERN_DATE_FORMAT = re.compile(r"\d{4}(\D)*\d{1,2}(\D)*\d{1,2}")
 
 def populate_obj(model_obj, data_dic: dict, attr_list=None, error_if_no_key=False):
     """
-    通过 dict 设置模型对应的属性 
+    通过 dict 设置模型对应的属性
     :param model_obj:
     :param data_dic:
     :param attr_list:
@@ -348,7 +348,7 @@ def return_risk_analysis_old(nav_df: pd.DataFrame, date_frm=None, date_to=None, 
     if day_per_data <= 0.005:
         freq_real = 'minute'
     elif day_per_data <= 0.2:
-            freq_real = 'hour'
+        freq_real = 'hour'
     elif day_per_data <= 2:
         freq_real = 'daily'
     elif day_per_data <= 10:
@@ -444,7 +444,7 @@ def return_risk_analysis_old(nav_df: pd.DataFrame, date_frm=None, date_to=None, 
         # End of Natural month return
         data_len = data_df.shape[0]
         date_begin = data_df.Date[0]  # .date()
-        date_end = data_df.Date[data_len-1]
+        date_end = data_df.Date[data_len - 1]
         stat_dic = OrderedDict([('起始日期', date_begin),
                                 ('截止日期', date_end),
                                 ('区间收益率', '%.2f%%' % (period_rr * 100)),
@@ -489,7 +489,7 @@ def calc_performance(nav_df: pd.DataFrame, date_frm=None, date_to=None, freq='we
     if day_per_data <= 0.008:
         freq_real = 'minute'
     elif day_per_data <= 0.2:
-            freq_real = 'hour'
+        freq_real = 'hour'
     elif day_per_data <= 2:
         freq_real = 'daily'
     elif day_per_data <= 10:
@@ -658,7 +658,7 @@ def return_risk_analysis(nav_df: pd.DataFrame, date_frm=None, date_to=None, freq
     if day_per_data <= 0.008:
         freq_real = 'minute'
     elif day_per_data <= 0.2:
-            freq_real = 'hour'
+        freq_real = 'hour'
     elif day_per_data <= 2:
         freq_real = 'daily'
     elif day_per_data <= 10:
@@ -757,7 +757,7 @@ def return_risk_analysis(nav_df: pd.DataFrame, date_frm=None, date_to=None, freq
         # End of Natural month return
         data_len = data_df.shape[0]
         date_begin = data_df.Date[0]  # .date()
-        date_end = data_df.Date[data_len-1]
+        date_end = data_df.Date[data_len - 1]
         stat_dic = OrderedDict([('起始日期', date_begin),
                                 ('截止日期', date_end),
                                 ('区间收益率', '%.2f%%' % (period_rr * 100)),
@@ -819,11 +819,13 @@ class DataFrame(pd.DataFrame):
 
 def reduce_list(funx, data_list, initial=None):
     result_list = []
+
     def reduce_func(x, y):
         # print(x,y)
         result = funx(x, y)
         result_list.append(result)
         return result
+
     if initial is None:
         reduce(reduce_func, data_list)
     else:
@@ -843,7 +845,7 @@ def _calc_mdd_4_drawback_analysis(pair, y):
     max_y = max_y_last if max_y_last > y else y
     mdd_last = pair[1]
     keep_max = pair[2]
-    dd = y / max_y -1
+    dd = y / max_y - 1
     if keep_max:
         mdd = dd if dd < mdd_last else mdd_last
     else:
@@ -860,7 +862,8 @@ def drawback_analysis(data_df, keep_max=False):
     if data_df is None or data_df.shape[0] <= 1:
         mdd_df = None
     else:
-        mdd_df = data_df.apply(lambda xx: [rr[1] for rr in reduce_list(_calc_mdd_4_drawback_analysis, xx, (xx.iloc[0], 0, keep_max))])
+        mdd_df = data_df.apply(
+            lambda xx: [rr[1] for rr in reduce_list(_calc_mdd_4_drawback_analysis, xx, (xx.iloc[0], 0, keep_max))])
     return mdd_df
 
 
@@ -895,7 +898,7 @@ def return_risk_analysis_by_xls(file_path, date_col=None, nav_col_list=None):
                 sheet = workbook.sheet_by_name(sheet_name)
                 # 取得日期索引后退出
                 col_name = sheet.cell_value(0, index_col)
-                while not(col_name is None or col_name == ""):
+                while not (col_name is None or col_name == ""):
                     if col_name == date_col:
                         break
                     index_col += 1
