@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Hello</title>
+</head>
+<body>
+Hello World
+<div>
+    {{ form.name.label }}
+    {{ form.name(class_="form-control input-lg") }}
+</div>
+
+{% for item in form %}
+<div>
+    {{ item.label }} |
+    {{ item }}
+</div>
+{% endfor %}
+</body>
+</html>
