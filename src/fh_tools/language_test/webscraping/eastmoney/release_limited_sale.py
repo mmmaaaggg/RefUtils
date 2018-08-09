@@ -10,7 +10,7 @@ import requests
 import pandas as pd
 from selenium import webdriver
 
-browser = webdriver.Chrome(executable_path=r'd:\Downloads\fetch_eastmoney\chromedriver.exe')
+browser = webdriver.Chrome(executable_path=r'd:\Softwares\Chrome\chromedriver.exe')
 
 
 def fetch_release_limited_sale(stock_code, output_path):
@@ -30,6 +30,7 @@ def fetch_release_limited_sale(stock_code, output_path):
     if len(table_df_list) > 0:
         table_df = table_df_list[0]
         table_df.to_csv(output_path, index=False)
+        print(table_df)
 
 
 if __name__ == "__main__":
