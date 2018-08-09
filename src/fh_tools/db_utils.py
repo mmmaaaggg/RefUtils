@@ -14,8 +14,9 @@ import json
 from datetime import date, datetime, timedelta
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import Insert
-from .fh_utils import date_2_str
+from src.fh_tools.fh_utils import date_2_str
 import logging
+import pandas as pd
 logger = logging.getLogger()
 
 
@@ -116,3 +117,58 @@ def alter_table_2_myisam(engine_md, table_name_list=None):
             logger.info('%d/%d)修改 %s 表引擎为 MyISAM', num, data_count, table_name)
             sql_str = "ALTER TABLE %s ENGINE = MyISAM" % table_name
             session.execute(sql_str)
+
+
+def bunch_insert_on_duplicate_update(df: pd.DataFrame, table_name, engine, dtype=None):
+    """
+    将 DataFrame 数据批量插入数据库，ON DUPLICATE KEY UPDATE
+    :param df:
+    :param table_name:
+    :param engine:
+    :param dtype: 仅在表不存在的情况下自动创建使用
+    :return:
+    """
+    has_table = engine.has_table(table_name)
+    if has_table:
+        col_name_list = list(df.columns)
+        generated_directive = ["{0}=VALUES({0})".format(col_name) for col_name in col_name_list]
+        sql_str = "insert into {table_name}({col_names}) VALUES({params}) ON DUPLICATE KEY UPDATE {update}".format(
+            table_name=table_name,
+            col_names=','.join(col_name_list),
+            params=','.join([':' + col_name for col_name in col_name_list]),
+            update=','.join(generated_directive),
+        )
+        data_dic_list = df.to_dict('records')
+        for data_dic in data_dic_list:
+            for k, v in data_dic.items():
+                if isinstance(v, float) and np.isnan(v):
+                    data_dic[k] = None
+        with with_db_session(engine) as session:
+            rslt = session.execute(sql_str, params=data_dic)
+            insert_count = rslt.rowcount
+            session.commit()
+    else:
+        df.to_sql(table_name, engine, if_exists='append', index=False, dtype=dtype)
+        insert_count = df.shape[0]
+
+    return insert_count
+
+
+if __name__ == "__main__":
+    from sqlalchemy import create_engine
+    import numpy as np
+    engine = create_engine("mysql://mg:Dcba1234@localhost/md_integration?charset=utf8",
+                           echo=False, encoding="utf-8")
+    table_name = 'test_only'
+    if not engine.has_table(table_name):
+        df = pd.DataFrame({'a': [1.0, 11.0], 'b': [2.0, 22.0], 'c': [3, 33], 'd': [4, 44]})
+        df.to_sql(table_name, engine, index=False, if_exists='append')
+        with with_db_session(engine) as session:
+            session.execute("""ALTER TABLE {table_name}
+        CHANGE COLUMN a a DOUBLE NOT NULL FIRST,
+        CHANGE COLUMN d d INTEGER,
+        ADD PRIMARY KEY (a)""".format(table_name=table_name))
+
+    df = pd.DataFrame({'a': [1.0, 111.0], 'b': [2.2, 222.0], 'c': [3.0, np.nan]})
+    insert_count = bunch_insert_on_duplicate_update(df, table_name, engine, dtype=None)
+    print(insert_count)
