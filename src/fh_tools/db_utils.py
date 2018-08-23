@@ -8,7 +8,6 @@
 @desc    : 数据库相关工具
 """
 import pandas as pd
-import numpy as np
 from sqlalchemy import MetaData, Column, Table
 from sqlalchemy.orm.session import Session
 from sqlalchemy.orm import sessionmaker
@@ -146,19 +145,27 @@ def add_col_2_table(engine, table_name, col_name, col_type_str):
         logger.info('%s 添加 %s [%s] 列成功', table_name, col_name, col_type_str)
 
 
-def bunch_insert_on_duplicate_update(df: pd.DataFrame, table_name, engine, dtype=None):
+def bunch_insert_on_duplicate_update(df: pd.DataFrame, table_name, engine, dtype=None, ignore_none=True):
     """
     将 DataFrame 数据批量插入数据库，ON DUPLICATE KEY UPDATE
     :param df:
     :param table_name:
     :param engine:
     :param dtype: 仅在表不存在的情况下自动创建使用
+    :param ignore_none: 为 None 或 NaN 字段不更新
     :return:
     """
+    if df is None or df.shape[0] == 0:
+        return 0
+
     has_table = engine.has_table(table_name)
     if has_table:
         col_name_list = list(df.columns)
-        generated_directive = ["`{0}`=VALUES(`{0}`)".format(col_name) for col_name in col_name_list]
+        if ignore_none:
+            generated_directive = ["`{0}`=IFNULL(VALUES(`{0}`), `{0}`)".format(col_name) for col_name in col_name_list]
+        else:
+            generated_directive = ["`{0}`=VALUES(`{0}`)".format(col_name) for col_name in col_name_list]
+
         sql_str = "insert into {table_name}({col_names}) VALUES({params}) ON DUPLICATE KEY UPDATE {update}".format(
             table_name=table_name,
             col_names= "`" + "`,`".join(col_name_list) + "`",
@@ -196,6 +203,6 @@ if __name__ == "__main__":
         CHANGE COLUMN d d INTEGER,
         ADD PRIMARY KEY (a)""".format(table_name=table_name))
 
-    df = pd.DataFrame({'a': [1.0, 111.0], 'b': [2.2, 222.0], 'c': [3.0, np.nan]})
+    df = pd.DataFrame({'a': [1.0, 111.0], 'b': [2.2, 222.0], 'c': [np.nan, np.nan]})
     insert_count = bunch_insert_on_duplicate_update(df, table_name, engine, dtype=None)
     print(insert_count)
