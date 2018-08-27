@@ -28,7 +28,7 @@ coinlist_df = pro.coinlist(start_date='20170101', end_date='20171231')
 coinpair_df = pro.coinpair(exchange='huobi', trade_date='20180802')
 
 # 行情数据
-coinbar_df3 = pro.coinbar(exchange='huobi', symbol='gxsbtc', freq='1min', start_date='20180701', end_date='20180801')
+coinbar_df3 = pro.coinbar(exchange='huobi', symbol='e', freq='1min', start_date='20180701', end_date='20180801')
 
 
 # df = pro.trade_cal(exchange_id='', start_date='20180101', end_date='', fields='pretrade_date', is_open='0')
