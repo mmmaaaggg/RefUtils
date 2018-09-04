@@ -1,2 +1,2 @@
-python pro_listings_latest_auto_wall.py
-ping /n 2 127.1>nul
+python pro_listings_latest_auto_wall_close_normally.py
+ping 127.0.0.1 -n 6 >nul

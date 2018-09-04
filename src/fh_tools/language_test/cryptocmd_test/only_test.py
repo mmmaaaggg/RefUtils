@@ -11,7 +11,7 @@
 from cryptocmd import CmcScraper
 
 # initialise scraper without passing time interval
-coin_code = 'EOS'
+coin_code = 'ACC'
 scraper = CmcScraper(coin_code)
 
 # data as list of list in a variable
