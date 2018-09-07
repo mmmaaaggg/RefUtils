@@ -144,7 +144,7 @@ def close_sub_process_by_mouse():
     # pyautogui.moveTo(rect_left + 10, rect_top + 10)
     # pyautogui.click(rect_left + 10, rect_top + 10, button='right')
     mouse_click(rect_left + 10, rect_top + 10, button='right')
-    time.sleep(1)
+    time.sleep(2)
     # pyautogui.moveTo(rect_left + 30, rect_top - 10)
     # pyautogui.click(rect_left + 30, rect_top - 10)
     mouse_click(rect_left - 30, rect_top - 10)
@@ -259,7 +259,7 @@ if __name__ == "__main__":
         # close_sub_process(sub_process)
         _, p_name = os.path.split(command_path)
         kill_process_by_name(p_name)
-        pass
+        time.sleep(5)
 
     # 将输出文件发送邮件
     # subject = 'CoinMarketCap 最新价格列表' + datetime.now().strftime('%Y-%m-%d %H:%M:%S')
