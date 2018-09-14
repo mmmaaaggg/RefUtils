@@ -27,6 +27,20 @@ PATTERN_DATE_FORMAT_RESTRICT = re.compile(r"\d{4}(\D)*\d{2}(\D)*\d{2}")
 PATTERN_DATE_FORMAT = re.compile(r"\d{4}(\D)*\d{1,2}(\D)*\d{1,2}")
 
 
+def is_any(iterable, func):
+    """
+    查找是否存在任何一个为True的结果，否则返回False
+    :param iterable:
+    :param func:
+    :return:
+    """
+    for x in iterable:
+        if func(x):
+            return True
+    else:
+        return False
+
+
 def is_not_nan_or_none(x):
     """
     判断是否不是 NAN 或 None
@@ -117,13 +131,14 @@ def log_param_when_exception(func):
     return handler
 
 
-def try_n_times(times=3, sleep_time=3, logger: logging.Logger=None, exception=Exception):
+def try_n_times(times=3, sleep_time=3, logger: logging.Logger=None, exception=Exception, exception_sleep_time=0):
     """
     尝试最多 times 次，异常捕获记录后继续尝试
     :param times:
     :param sleep_time:
     :param logger: 如果异常需要 log 记录则传入参数
     :param exception: 可用于捕获指定异常，默认 Exception
+    :param exception_sleep_time: 当出现异常情况下，sleep n 秒
     :return:
     """
     last_invoked_time = [None]
@@ -142,6 +157,8 @@ def try_n_times(times=3, sleep_time=3, logger: logging.Logger=None, exception=Ex
                 except exception:
                     if logger is not None:
                         logger.exception("第 %d 次调用 %s(%s, %s) 出错", n, func.__name__, arg, kwargs)
+                    if exception_sleep_time is not None and exception_sleep_time > 0:
+                        time.sleep(exception_sleep_time)
                     continue
                 finally:
                     last_invoked_time[0] = time.time()
