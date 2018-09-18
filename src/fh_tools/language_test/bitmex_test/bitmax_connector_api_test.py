@@ -15,10 +15,12 @@ import time
 import swagger_client
 from swagger_client.rest import ApiException
 from pprint import pprint
+import json
 
 # Configure API key authorization: apiKey
 configuration = swagger_client.Configuration()
 configuration.api_key['api-key'] = 'DRyB920Sqb9LOgZXX3xowTEezJVBMc-zqrLVz4xOIqwAw4tf'
+configuration.host = "https://testnet.bitmex.com/api/v1"
 configuration.host = "https://testnet.bitmex.com/api/v1"
 # Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
 # configuration.api_key_prefix['api-key'] = 'Bearer'
@@ -26,12 +28,14 @@ configuration.host = "https://testnet.bitmex.com/api/v1"
 configuration = swagger_client.Configuration()
 configuration.api_key['api-nonce'] = 'DRyB920Sqb9LOgZXX3xowTEezJVBMc-zqrLVz4xOIqwAw4tf'
 configuration.host = "https://www.bitmex.com/api/v1"
+configuration.host = "https://testnet.bitmex.com/api/v1"
 # Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
 # configuration.api_key_prefix['api-nonce'] = 'Bearer'
 # Configure API key authorization: apiSignature
 configuration = swagger_client.Configuration()
 configuration.api_key['api-signature'] = 'DRyB920Sqb9LOgZXX3xowTEezJVBMc-zqrLVz4xOIqwAw4tf'
 configuration.host = "https://www.bitmex.com/api/v1"
+configuration.host = "https://testnet.bitmex.com/api/v1"
 # Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
 # configuration.api_key_prefix['api-signature'] = 'Bearer'
 
@@ -43,7 +47,8 @@ try:
     # Disable an API Key.
     # api_response = api_instance.a_pi_key_enable(api_key_id)
     # pprint(api_response)
-    char = swagger_client.ChatApi(swagger_client.ApiClient(configuration))
-    json = char.chat_get()
+    client = swagger_client.InstrumentApi(swagger_client.ApiClient(configuration))
+    json_str = client.instrument_get()
+    data_dic = json.loads(json_str)
 except ApiException as e:
     print("Exception when calling APIKeyApi->a_pi_key_disable: %s\n" % e)
