@@ -98,6 +98,7 @@ def find_hwnds_by_matchers(matcher_list, hwnd_parent=None):
 
 
 def kill_process_by_name(p_name):
+    from psutil._exceptions import NoSuchProcess
     for pid in psutil.pids():
         try:
             p = psutil.Process(pid)
@@ -107,6 +108,8 @@ def kill_process_by_name(p_name):
                 # os.system("TASKKILL /F /IM 'League of Legends.exe'")
                 os.kill(pid, 9)
                 break
+        except NoSuchProcess:
+            pass
         except:
             logger.exception('结束进程失败')
             return -1
@@ -239,7 +242,44 @@ def send_email_qq(from_mail, to_mail_list, password, msg):
 
 
 if __name__ == "__main__":
+    from logging.config import dictConfig
+
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s: %(levelname)s [%(name)s] %(message)s')
+    # log settings
+    logging_config = dict(
+        version=1,
+        formatters={
+            'simple': {
+                'format': '%(asctime)s %(name)s|%(module)s.%(funcName)s:%(lineno)d %(levelname)s %(message)s'}
+        },
+        handlers={
+            'file_handler':
+                {
+                    'class': 'logging.handlers.RotatingFileHandler',
+                    'filename': 'logger.log',
+                    'maxBytes': 1024 * 1024 * 10,
+                    'backupCount': 5,
+                    'level': 'DEBUG',
+                    'formatter': 'simple',
+                    'encoding': 'utf8'
+                },
+            'console_handler':
+                {
+                    'class': 'logging.StreamHandler',
+                    'level': 'DEBUG',
+                    'formatter': 'simple'
+                }
+        },
+
+        root={
+            'handlers': ['console_handler', 'file_handler'],
+            'level': logging.DEBUG,
+        }
+    )
+    logging.getLogger('sqlalchemy.engine').setLevel(logging.WARN)
+    logging.getLogger('urllib3.connectionpool').setLevel(logging.INFO)
+    dictConfig(logging_config)
+
     from datetime import datetime
     import time
 
