@@ -8,7 +8,7 @@
 @desc    : openpyxl, pandas, xlrd
 """
 import xlrd
-import xlutils
+import xlutils.copy
 import xlwt
 import re
 import os
@@ -20,12 +20,12 @@ import logging
 logger = logging.getLogger()
 
 
-def update_nav_file(file_path, fund_nav_dic, cash=None, nav_date=date.today()):
+def update_nav_file(file_path, fund_nav_dic, cash_dic=None, nav_date=date.today()):
     """
     更新净值文件中的净值
     :param file_path:
     :param fund_nav_dic:
-    :param cash:
+    :param cash_dic:
     :param nav_date:
     :return:
     """
@@ -35,6 +35,7 @@ def update_nav_file(file_path, fund_nav_dic, cash=None, nav_date=date.today()):
     elif isinstance(nav_date, str):
         nav_date = str_2_date(nav_date)
 
+    ret_data_list = []
     file_path_name, file_extension = os.path.splitext(file_path)
 
     workbook = xlrd.open_workbook(file_path)
@@ -44,7 +45,13 @@ def update_nav_file(file_path, fund_nav_dic, cash=None, nav_date=date.today()):
         # 取得名称，日期，份额数据
         fund_name = sheet.cell_value(0, 1)
         setup_date = xlrd.xldate_as_datetime(sheet.cell_value(1, 1), 0).date()
-        volume = sheet.cell_value(2, 1)
+        fund_volume = sheet.cell_value(2, 1)
+        ret_data_dic = {
+            'product_name': fund_name,
+            'setup_date': setup_date,
+            'volume': fund_volume,
+            'sub_product_list': [],
+        }
         # 读取各种费用及借贷利息等信息
         fee_dic, loan_dic, name_last = {}, {}, ''
         row_num = 3
@@ -91,6 +98,7 @@ def update_nav_file(file_path, fund_nav_dic, cash=None, nav_date=date.today()):
         for prod_num, product_name in enumerate(product_name_list):
             col_num = 1 + prod_num * 3
             if product_name in loan_dic:
+                nav, volume = 1, 0
                 # 借款：计算利息收入加上本金即为市值
                 # 市值
                 load_info_dic = loan_dic[product_name]
@@ -109,15 +117,29 @@ def update_nav_file(file_path, fund_nav_dic, cash=None, nav_date=date.today()):
 
                 data_df_new.iloc[last_row, col_num] = nav
                 # 份额不变
-                data_df_new.iloc[last_row, col_num + 1] = data_df_new.iloc[last_row - 1, col_num + 1]
+                volume = data_df_new.iloc[last_row - 1, col_num + 1]
+                data_df_new.iloc[last_row, col_num + 1] = volume
                 # 市值
                 value = float(data_df_new.iloc[last_row, col_num + 1]) * nav
                 data_df_new.iloc[last_row, col_num + 2] = value
                 tot_val += value
 
+            # 保存子产品信息
+            ret_data_dic['sub_product_list'].append({
+                'product_name': product_name,
+                'volume': volume,
+                'nav': nav,
+                # 'nav_last': 1.1521,
+                # 'nav_chg': 0.0025,
+                # 'rr': 0.1325,
+                # 'vol_pct': 0.1,  # 持仓比例
+            })
+
         # 更新现金
-        if cash is None:
+        if cash_dic is None:
             cash = data_df_new['银行现金'].iloc[last_row - 1]
+        else:
+            cash = 0
         data_df_new['银行现金'].iloc[last_row] = cash
         tot_val += cash
 
@@ -125,15 +147,15 @@ def update_nav_file(file_path, fund_nav_dic, cash=None, nav_date=date.today()):
         tot_fee = 0
         for key, info_dic in fee_dic.items():
             end_date = info_dic.setdefault('end_date', nav_date)
-            manage_fee = - (end_date - info_dic['base_date']).days / 365 * volume * info_dic['rate']
+            manage_fee = - (end_date - info_dic['base_date']).days / 365 * fund_volume * info_dic['rate']
             data_df_new[key].iloc[last_row] = manage_fee
             tot_fee += manage_fee
 
         # 计算新净值
         data_df_new['总市值（费前）'].iloc[last_row] = tot_val
         data_df_new['总市值（费后）'].iloc[last_row] = tot_val + tot_fee
-        data_df_new['净值（费前）'].iloc[last_row] = tot_val / volume
-        data_df_new['净值（费后）'].iloc[last_row] = (tot_val + tot_fee) / volume
+        data_df_new['净值（费前）'].iloc[last_row] = tot_val / fund_volume
+        data_df_new['净值（费后）'].iloc[last_row] = nav = (tot_val + tot_fee) / fund_volume
 
         # 保存文件
         # 再源文件基础上增量更新
@@ -163,6 +185,15 @@ def update_nav_file(file_path, fund_nav_dic, cash=None, nav_date=date.today()):
         # 保存独立 DataFrame 文件
         file_path_df = file_path_name + '_df_' + date_2_str(nav_date) + file_extension
         data_df_new.to_excel(file_path_df)
+        # 保存返回信息
+        ret_data_dic['nav'] = nav
+        nav_last = data_df_new['净值（费后）'].iloc[last_row - 1]
+        ret_data_dic['nav_last'] = nav_last
+        ret_data_dic['nav_chg'] = nav - nav_last
+        ret_data_dic['rr'] = nav ** (365 / (nav_date - setup_date).days) if (nav_date - setup_date).days > 10 else 0.0
+        ret_data_list.append(ret_data_dic)
+
+    return ret_data_list
 
 
 def read_nav_files(folder_path):
@@ -190,5 +221,65 @@ if __name__ == "__main__":
     folder_path = r'd:\WSPych\RefUtils\src\fh_tools\nav_tools\product_nav'
     fund_nav_dic = read_nav_files(folder_path)
     file_path = r'D:\WSPych\RefUtils\src\fh_tools\nav_tools\净值计算模板 - 完整版.xls'
-    cash = None
-    update_nav_file(file_path, fund_nav_dic, cash=cash)
+    ret_data_list = update_nav_file(file_path, fund_nav_dic, cash_dic=None)
+    print(ret_data_list)
+    data_list = [
+        {
+            'product_name': '复华财通定增投资基金',
+            'volume': 3924.53,
+            'setup_date': '2013/12/31',
+            'nav': 1.1492,
+            'nav_last': 1.1521,
+            'nav_chg': 0.0025,
+            'rr': 0.1325,
+            'sub_product_list': [
+                {
+                    'product_name': '展弘稳进1号',
+                    'volume': 400.00,
+                    'nav': 1.1492,
+                    'nav_last': 1.1521,
+                    'nav_chg': 0.0025,
+                    'rr': 0.1325,
+                    'vol_pct': 0.1,  # 持仓比例
+                },
+                {
+                    'product_name': '新萌亮点1号',
+                    'volume': 800.00,
+                    'nav': 1.1592,
+                    'nav_last': 1.1721,
+                    'nav_chg': 0.0025,
+                    'rr': 0.1425,
+                    'vol_pct': 0.2,  # 持仓比例
+                },
+            ],
+        },
+        {
+            'product_name': '鑫隆稳进FOF',
+            'volume': 3924.53,
+            'setup_date': '2013/12/31',
+            'sub_product_list': [
+                {
+                    'product_name': '展弘稳进1号',
+                    'volume': 400.00,
+                    'nav': 1.1492,
+                    'nav_last': 1.1521,
+                    'nav_chg': 0.0025,
+                    'rr': 0.1325,
+                    'vol_pct': 0.1,  # 持仓比例
+                },
+                {
+                    'product_name': '新萌亮点1号',
+                    'volume': 800.00,
+                    'nav': 1.1592,
+                    'nav_last': 1.1721,
+                    'nav_chg': 0.0025,
+                    'rr': 0.1425,
+                    'vol_pct': 0.2,  # 持仓比例
+                },
+            ],
+            'nav': 1.1492,
+            'nav_last': 1.1521,
+            'nav_chg': 0.0025,
+            'rr': 0.1325,
+        },
+    ]
