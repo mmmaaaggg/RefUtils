@@ -103,7 +103,7 @@ def update_nav_file(file_path, fund_nav_dic, cash_dic=None, nav_date=date.today(
                 # 市值
                 load_info_dic = loan_dic[product_name]
                 value = load_info_dic['load_cost'] * (1 + load_info_dic['rate']) * (
-                            nav_date - load_info_dic['base_date']).days / 365
+                        nav_date - load_info_dic['base_date']).days / 365
                 data_df_new.iloc[last_row, col_num + 2] = value
                 tot_val += value
             else:
@@ -162,11 +162,9 @@ def update_nav_file(file_path, fund_nav_dic, cash_dic=None, nav_date=date.today(
         file_path_new = file_path_name + '_' + date_2_str(nav_date) + file_extension
         workbook_new = xlutils.copy.copy(workbook)
         sheet = workbook_new.get_sheet(sheet_num)
-        # ctype = 1 # 类型 0 empty,1 string, 2 number, 3 date, 4 boolean, 5 error
-        # xf = 0 # 扩展的格式化 (默认是0)
+        # nav_date
         style = xlwt.XFStyle()
         style.num_format_str = 'YYYY/M/D'
-        # nav_date
         sheet.write(row_num + last_row + 1, 0, nav_date, style)
         # 各个产品的【净值	份额	市值】
         # 银行现金	管理费1	管理费2	托管费	总市值（费前）	净值（费前）	总市值（费后）	净值（费后）
@@ -176,10 +174,7 @@ def update_nav_file(file_path, fund_nav_dic, cash_dic=None, nav_date=date.today(
             if value is None:
                 continue
             style = xlwt.XFStyle()
-            if value < 0:
-                style.num_format_str = '_(#,##0.00_);[Red](#,##0.00)'
-            else:
-                style.num_format_str = '_(#,##0.00_);(#,##0.00)'
+            style.num_format_str = '_(#,##0.00_);[Red](#,##0.00)'
             sheet.write(row_num + last_row + 1, col_num, value, style)
         workbook_new.save(file_path_new)
         # 保存独立 DataFrame 文件
@@ -217,69 +212,162 @@ def read_nav_files(folder_path):
     return fund_dictionay
 
 
+def save_nav_files(data_list, save_path):
+    # 创建excel工作表
+    workbook = xlwt.Workbook(encoding='utf-8')
+    worksheet = workbook.add_sheet('sheet1')
+    # 设置表头
+    worksheet.write(0, 0, label='产品名称')  # product_name
+    worksheet.write(0, 1, label='产品规模（万）')  # volume
+    worksheet.write(0, 2, label='基金成立日期')  # setup_date
+    worksheet.write(0, 3, label='所投资管计划/信托计划名称')  # sub_product_list
+    worksheet.write(0, 4, label='子基金所投规模（万）')  # volume
+    worksheet.write(0, 5, label='子基金净值')  # nav
+    worksheet.write(0, 6, label='子基金上期净值')  # nav_last
+    worksheet.write(0, 7, label='子基金净值变动率')  # nav_chg
+    worksheet.write(0, 8, label='子基金收益率（年化）')  # rr
+    worksheet.write(0, 9, label='子基金持仓比例')  # vol_pct
+    worksheet.write(0, 10, label='基金净值')  # nav
+    worksheet.write(0, 11, label='上期净值')  # nav_last
+    worksheet.write(0, 12, label='收益率（年化）')  # rr
+    worksheet.write(0, 13, label='净值变动率')  # nav_chg
+    # 将数据写入excel
+    row_num = 0
+    for list_item in data_list:
+        row_num += 1
+        row_sub_num = -1
+        for key, value in list_item.items():
+            if key == "product_name":
+                worksheet.write(row_num, 0, value)
+            elif key == "volume":
+                style = xlwt.XFStyle()
+                style.num_format_str = '_(#,##0_);(#,##0)'
+                worksheet.write(row_num, 1, value/10000, style)
+            elif key == "setup_date":
+                style = xlwt.XFStyle()
+                style.num_format_str = 'YYYY/M/D'
+                worksheet.write(row_num, 2, value, style)
+            elif key == "nav":
+                style = xlwt.XFStyle()
+                style.num_format_str = '0.00'
+                worksheet.write(row_num, 10, value, style)
+            elif key == "nav_last":
+                style = xlwt.XFStyle()
+                style.num_format_str = '0.00'
+                worksheet.write(row_num, 11, value, style)
+            elif key == "rr":
+                style = xlwt.XFStyle()
+                style.num_format_str = '0.00%'
+                worksheet.write(row_num, 12, value, style)
+            elif key == "nav_chg":
+                style = xlwt.XFStyle()
+                style.num_format_str = '_(#,##0.00_);[Red](#,##0.00)'
+                value = - value
+                worksheet.write(row_num, 13, value, style)
+            elif key == "sub_product_list":
+                for list_item_sub in data_list[0]['sub_product_list']:
+                    row_sub_num += 1
+                    for key, value in list_item_sub.items():
+                        row_real_num = row_num + row_sub_num
+                        if key == "product_name":
+                            worksheet.write(row_real_num, 3, value)
+                        elif key == "volume":
+                            style = xlwt.XFStyle()
+                            style.num_format_str = '_(#,##0_);(#,##0)'
+                            worksheet.write(row_real_num, 4, value/10000, style)
+                        elif key == "nav":
+                            style = xlwt.XFStyle()
+                            style.num_format_str = '0.00'
+                            worksheet.write(row_real_num, 5, value, style)
+                        elif key == "nav_last":
+                            style = xlwt.XFStyle()
+                            style.num_format_str = '0.00'
+                            worksheet.write(row_real_num, 6, value, style)
+                        elif key == "nav_chg":
+                            style = xlwt.XFStyle()
+                            style.num_format_str = '_(#,##0.00_);[Red](#,##0.00)'
+                            worksheet.write(row_real_num, 7, value, style)
+                        elif key == "rr":
+                            style = xlwt.XFStyle()
+                            style.num_format_str = '0.00%'
+                            worksheet.write(row_real_num, 8, value, style)
+                        elif key == "vol_pct":
+                            style = xlwt.XFStyle()
+                            style.num_format_str = '0.00%'
+                            worksheet.write(row_real_num, 9, value, style)
+            else:
+                pass
+        if row_sub_num >= 0:
+            row_num += row_sub_num
+    # 保存
+    workbook.save(save_path)
+
+
 if __name__ == "__main__":
     folder_path = r'd:\WSPych\RefUtils\src\fh_tools\nav_tools\product_nav'
     fund_nav_dic = read_nav_files(folder_path)
     file_path = r'D:\WSPych\RefUtils\src\fh_tools\nav_tools\净值计算模板 - 完整版.xls'
     ret_data_list = update_nav_file(file_path, fund_nav_dic, cash_dic=None)
-    print(ret_data_list)
-    data_list = [
-        {
-            'product_name': '复华财通定增投资基金',
-            'volume': 3924.53,
-            'setup_date': '2013/12/31',
-            'nav': 1.1492,
-            'nav_last': 1.1521,
-            'nav_chg': 0.0025,
-            'rr': 0.1325,
-            'sub_product_list': [
-                {
-                    'product_name': '展弘稳进1号',
-                    'volume': 400.00,
-                    'nav': 1.1492,
-                    'nav_last': 1.1521,
-                    'nav_chg': 0.0025,
-                    'rr': 0.1325,
-                    'vol_pct': 0.1,  # 持仓比例
-                },
-                {
-                    'product_name': '新萌亮点1号',
-                    'volume': 800.00,
-                    'nav': 1.1592,
-                    'nav_last': 1.1721,
-                    'nav_chg': 0.0025,
-                    'rr': 0.1425,
-                    'vol_pct': 0.2,  # 持仓比例
-                },
-            ],
-        },
-        {
-            'product_name': '鑫隆稳进FOF',
-            'volume': 3924.53,
-            'setup_date': '2013/12/31',
-            'sub_product_list': [
-                {
-                    'product_name': '展弘稳进1号',
-                    'volume': 400.00,
-                    'nav': 1.1492,
-                    'nav_last': 1.1521,
-                    'nav_chg': 0.0025,
-                    'rr': 0.1325,
-                    'vol_pct': 0.1,  # 持仓比例
-                },
-                {
-                    'product_name': '新萌亮点1号',
-                    'volume': 800.00,
-                    'nav': 1.1592,
-                    'nav_last': 1.1721,
-                    'nav_chg': 0.0025,
-                    'rr': 0.1425,
-                    'vol_pct': 0.2,  # 持仓比例
-                },
-            ],
-            'nav': 1.1492,
-            'nav_last': 1.1521,
-            'nav_chg': 0.0025,
-            'rr': 0.1325,
-        },
-    ]
+    save_path = r'D:\WSPych\RefUtils\src\fh_tools\nav_tools\nav_summary.xls'
+    save_nav_files(ret_data_list, save_path)
+    # print(ret_data_list)
+    # data_list = [
+    #     {
+    #         'product_name': '复华财通定增投资基金',
+    #         'volume': 3924.53,
+    #         'setup_date': str_2_date('2013-12-31'),
+    #         'nav': 1.1492,
+    #         'nav_last': 1.1521,
+    #         'nav_chg': 0.0025,
+    #         'rr': 0.1325,
+    #         'sub_product_list': [
+    #             {
+    #                 'product_name': '展弘稳进1号',
+    #                 'volume': 400.00,
+    #                 'nav': 1.1492,
+    #                 'nav_last': 1.1521,
+    #                 'nav_chg': 0.0025,
+    #                 'rr': 0.1325,
+    #                 'vol_pct': 0.1,  # 持仓比例
+    #             },
+    #             {
+    #                 'product_name': '新萌亮点1号',
+    #                 'volume': 800.00,
+    #                 'nav': 1.1592,
+    #                 'nav_last': 1.1721,
+    #                 'nav_chg': 0.0025,
+    #                 'rr': 0.1425,
+    #                 'vol_pct': 0.2,  # 持仓比例
+    #             },
+    #         ],
+    #     },
+    #     {
+    #         'product_name': '鑫隆稳进FOF',
+    #         'volume': 3924.53,
+    #         'setup_date': str_2_date('2013-12-31'),
+    #         'sub_product_list': [
+    #             {
+    #                 'product_name': '展弘稳进1号',
+    #                 'volume': 400.00,
+    #                 'nav': 1.1492,
+    #                 'nav_last': 1.1521,
+    #                 'nav_chg': 0.0025,
+    #                 'rr': 0.1325,
+    #                 'vol_pct': 0.1,  # 持仓比例
+    #             },
+    #             {
+    #                 'product_name': '新萌亮点1号',
+    #                 'volume': 800.00,
+    #                 'nav': 1.1592,
+    #                 'nav_last': 1.1721,
+    #                 'nav_chg': 0.0025,
+    #                 'rr': 0.1425,
+    #                 'vol_pct': 0.2,  # 持仓比例
+    #             },
+    #         ],
+    #         'nav': 1.1492,
+    #         'nav_last': 1.1521,
+    #         'nav_chg': 0.0025,
+    #         'rr': 0.1325,
+    #     },
+    # ]
