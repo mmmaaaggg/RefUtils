@@ -16,6 +16,8 @@ df_group = df1.groupby(['level_0', 'level_1'])
 # print(df_group)
 grouped_df_dic = dict(list(df_group))
 #print(grouped_df_dic)
+ths_code_set_4_daily = set(df_group.size().index)
+print('key set:', ths_code_set_4_daily)
 for key, data_df in grouped_df_dic.items():
     print(key, '\n', data_df)
 # 无需 todict 在for items 直接 操作就可以
