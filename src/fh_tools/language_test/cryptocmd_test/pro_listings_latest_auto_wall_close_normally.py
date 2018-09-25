@@ -292,7 +292,7 @@ if __name__ == "__main__":
         df = get_price_latest()
 
         file_name = 'latest_price_{0}.csv'.format(datetime.now().strftime('%y-%m-%d %H-%M-%S'))
-        file_path = os.path.join(os.path.curdir, file_name)
+        file_path = os.path.join(os.path.curdir, 'latest_price', file_name)
         df.to_csv(file_path)
     finally:
         close_sub_process_by_mouse()
