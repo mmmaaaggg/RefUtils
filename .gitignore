@@ -109,3 +109,6 @@ ENV/
 *.xls
 *.xlsx
 *.rar
+
+# other persons folder
+src/data_analysis/wang_bo_chuan_transfer_pys/*
