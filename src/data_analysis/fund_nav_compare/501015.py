@@ -12,16 +12,21 @@ from pylab import mpl
 import pandas as pd
 from sqlalchemy import create_engine
 from src.fh_tools.db_utils import with_db_session
+from datetime import datetime
 
 mpl.rcParams['font.sans-serif'] = ['SimHei']  # 字体可以根据需要改动
 mpl.rcParams['axes.unicode_minus'] = False  # 解决中文减号不显示的问题
 engine = create_engine("mysql://mg:Dcba1234@localhost/md_integration?charset=utf8")
-data_df = pd.read_excel(r'D:\WSPych\RefUtils\src\data_analysis\fund_nav_compare\501015.xlsx').rename(
-    columns={'日期': 'trade_date', '收盘价(元)': 'nav'})[['trade_date', 'nav']].set_index('trade_date')
+# data_df = pd.read_excel(r'D:\WSPych\RefUtils\src\data_analysis\fund_nav_compare\501015 close.xlsx').rename(
+#     columns={'日期': 'trade_date', '收盘价(元)': 'nav'})[['trade_date', 'nav']].set_index('trade_date')
+data_df = pd.read_excel(r'D:\WSPych\RefUtils\src\data_analysis\fund_nav_compare\501015 nav.xlsx').rename(
+    columns={'日期': 'trade_date', '501015': 'nav'})[['trade_date', 'nav']]
+data_df['trade_date'] = data_df['trade_date'].apply(lambda x: x.date() if isinstance(x, datetime) else None)
+data_df.set_index('trade_date', inplace=True)
 index_code = '000300.SH'  # '399102.SZ'
 with with_db_session(engine) as session:
     index_name = session.execute(
-        'SELECT sec_name FROM md_integration.wind_index_info WHERE wind_code=:wind_code',
+        'SELECT sec_name FROM wind_index_info WHERE wind_code=:wind_code',
         params={'wind_code': index_code}).scalar()
 sec_name = index_name + " " + index_code
 index_df = pd.read_sql("SELECT trade_date, close FROM wind_index_daily WHERE wind_code = %s", engine,

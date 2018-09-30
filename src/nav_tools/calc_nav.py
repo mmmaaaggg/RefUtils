@@ -13,19 +13,20 @@ import xlwt
 import re
 import os
 import pandas as pd
-from src.fh_tools.fh_utils import date_2_str, str_2_date
+from src.fh_tools.fh_utils import date_2_str, str_2_date, try_2_date
 from datetime import date, datetime
 import logging
+from src.nav_tools.read_nav_files import read_nav_files
 
 logger = logging.getLogger()
 
 
-def update_nav_file(file_path, fund_nav_dic, cash_dic=None, nav_date=date.today()):
+def update_nav_file(file_path, fund_nav_dic, cash_df, nav_date=date.today()):
     """
     更新净值文件中的净值
     :param file_path:
     :param fund_nav_dic:
-    :param cash_dic:
+    :param cash_df:
     :param nav_date:
     :return:
     """
@@ -42,6 +43,9 @@ def update_nav_file(file_path, fund_nav_dic, cash_dic=None, nav_date=date.today(
     sheet_names = workbook.sheet_names()
     for sheet_num, sheet_name in enumerate(sheet_names, start=0):
         sheet = workbook.sheet_by_name(sheet_name)
+        # 判断第一个cell是不是“基金名称”不是则跳过
+        if sheet.cell_value(0, 0) != '基金名称':
+            continue
         # 取得名称，日期，份额数据
         fund_name = sheet.cell_value(0, 1)
         setup_date = xlrd.xldate_as_datetime(sheet.cell_value(1, 1), 0).date()
@@ -52,13 +56,13 @@ def update_nav_file(file_path, fund_nav_dic, cash_dic=None, nav_date=date.today(
             'volume': fund_volume,
             'sub_product_list': [],
         }
-        # 读取各种费用及借贷利息等信息
-        fee_dic, loan_dic, name_last = {}, {}, ''
+        # 读取各种费用及借贷利息，子产品信息
+        fee_dic, loan_dic = {}, {}
         row_num = 3
         cell_content = sheet.cell_value(row_num, 0)
         while cell_content != '日期' and cell_content != '':
-            load_cost = sheet.cell_value(row_num, 5)
-            if load_cost == '':
+            type_name = sheet.cell_value(row_num, 0)
+            if type_name in ('费用', '费用（按子产品份额）'):
                 # 费用
                 name = sheet.cell_value(row_num, 0)
                 fee_dic[name] = {
@@ -66,67 +70,83 @@ def update_nav_file(file_path, fund_nav_dic, cash_dic=None, nav_date=date.today(
                     'rate': sheet.cell_value(row_num, 1),
                     'base_date': xlrd.xldate_as_datetime(sheet.cell_value(row_num, 3), 0).date(),
                 }
-                if name_last.find('管理费') == 0:
+                end_date = sheet.cell_value(row_num, 7)
+                if end_date is not None and end_date != '':
                     # 有些管理费，分段计费
-                    fee_dic[name_last]['end_date'] = xlrd.xldate_as_datetime(sheet.cell_value(row_num, 3), 0).date()
-            else:
-                # 借款
-                loan_dic[sheet.cell_value(row_num, 0)] = {
-                    'name': sheet.cell_value(row_num, 0),
-                    'rate': sheet.cell_value(row_num, 1),
-                    'base_date': xlrd.xldate_as_datetime(sheet.cell_value(row_num, 3), 0).date(),
-                    'load_cost': sheet.cell_value(row_num, 3),
+                    fee_dic[name]['end_date'] = xlrd.xldate_as_datetime(end_date, 0).date()
+
+            elif type_name == '子产品':
+                # 借款，子基金
+                loan_dic[sheet.cell_value(row_num, 1)] = {
+                    'name': sheet.cell_value(row_num, 1),
+                    'rate': float(sheet.cell_value(row_num, 3)) if sheet.cell_value(row_num, 3) != '' else 0,
+                    'base_date': xlrd.xldate_as_datetime(sheet.cell_value(row_num, 5), 0).date(),
+                    'load_cost': float(sheet.cell_value(row_num, 7)) if sheet.cell_value(row_num, 7) != '' else 0,
                 }
+            else:
+                logger.error('有未识别的行: %d 该行第一列值为：%s', row_num, type_name)
+
             row_num += 1
             cell_content = sheet.cell_value(row_num, 0)
 
-        # 读取产品名称
-        col_num = 1
+        # 读取产品名称：横向读取每个产品名称间隔两个cell
+        row_start, col_num = row_num, 1
         cell_content = sheet.cell_value(row_num, col_num)
-        product_name_list = []
+        sub_product_name_list = []
         while cell_content != '':
-            product_name_list.append(cell_content)
+            sub_product_name_list.append(cell_content)
             col_num += 3
             cell_content = sheet.cell_value(row_num, col_num)
         # 获取历史净值数据
-        row_num += 1
+        row_num = row_start + 1
         data_df = pd.read_excel(file_path, sheet_name=sheet_num, header=row_num, index_col=0).reset_index()
         data_df_new = data_df.append([None]).copy()
         last_row = data_df_new.shape[0] - 1
         data_df_new.iloc[last_row, 0] = nav_date
         tot_val = 0
-        for prod_num, product_name in enumerate(product_name_list):
+        for prod_num, sub_product_name in enumerate(sub_product_name_list):
             col_num = 1 + prod_num * 3
-            if product_name in loan_dic:
-                nav, volume = 1, 0
-                # 借款：计算利息收入加上本金即为市值
-                # 市值
-                load_info_dic = loan_dic[product_name]
-                value = load_info_dic['load_cost'] * (1 + load_info_dic['rate']) * (
-                        nav_date - load_info_dic['base_date']).days / 365
-                data_df_new.iloc[last_row, col_num + 2] = value
-                tot_val += value
-            else:
-                # 净值类产品
-                # nav = get_nav(product_name)
-                if product_name in fund_nav_dic:
-                    nav = fund_nav_dic[product_name]
+            if sub_product_name in loan_dic:
+                sub_product_info_dic = loan_dic[sub_product_name]
+                rate = sub_product_info_dic['rate']
+                if rate > 0:
+                    nav, volume = 1, 0
+                    # 借款：计算利息收入加上本金即为市值
+                    # 市值
+                    value = sub_product_info_dic['load_cost'] * (1 + sub_product_info_dic['rate']) * (
+                            nav_date - sub_product_info_dic['base_date']).days / 365
+                    data_df_new.iloc[last_row, col_num + 2] = value
+                    tot_val += value
                 else:
-                    logger.warning("%s 净值未查到，默认净值为 1", product_name)
-                    nav = 1
+                    # 净值类产品
+                    # nav = get_nav(product_name)
+                    if sub_product_name in fund_nav_dic:
+                        nav = fund_nav_dic[sub_product_name]
+                    else:
+                        logger.warning("%s 净值未查到，默认净值为 1", sub_product_name)
+                        nav = 1
 
-                data_df_new.iloc[last_row, col_num] = nav
-                # 份额不变
+                    data_df_new.iloc[last_row, col_num] = nav
+                    # 份额不变
+                    volume = data_df_new.iloc[last_row - 1, col_num + 1]
+                    data_df_new.iloc[last_row, col_num + 1] = volume
+                    # 市值
+                    value = float(data_df_new.iloc[last_row, col_num + 1]) * nav
+                    data_df_new.iloc[last_row, col_num + 2] = value
+                    tot_val += value
+            else:
+                nav = data_df_new.iloc[last_row - 1, col_num]
                 volume = data_df_new.iloc[last_row - 1, col_num + 1]
+                value = data_df_new.iloc[last_row - 1, col_num + 2]
+                logger.error('子产品 %s 没有想过的基本信息，沿用上一计算日净值、份额、市值：',
+                             sub_product_name, (nav, volume, value))
+                data_df_new.iloc[last_row, col_num] = nav
                 data_df_new.iloc[last_row, col_num + 1] = volume
-                # 市值
-                value = float(data_df_new.iloc[last_row, col_num + 1]) * nav
                 data_df_new.iloc[last_row, col_num + 2] = value
-                tot_val += value
 
             # 保存子产品信息
             ret_data_dic['sub_product_list'].append({
-                'product_name': product_name,
+                'product_name': sub_product_name,
                 'volume': volume,
                 'nav': nav,
                 # 'nav_last': 1.1521,
@@ -136,12 +156,13 @@ def update_nav_file(file_path, fund_nav_dic, cash_dic=None, nav_date=date.today(
             })
 
         # 更新现金
-        if cash_dic is None:
-            cash = data_df_new['银行现金'].iloc[last_row - 1]
+        if cash_df is not None and fund_name in cash_df:
+            pass
         else:
-            cash = 0
-        data_df_new['银行现金'].iloc[last_row] = cash
-        tot_val += cash
+            logger.warning('没有找到 %d 现金余额， 使用上一次的数值', fund_name)
+            cash = data_df_new['银行现金'].iloc[last_row - 1]
+            data_df_new['银行现金'].iloc[last_row] = cash
+            tot_val += cash
 
         # 计算费用
         tot_fee = 0
@@ -191,27 +212,6 @@ def update_nav_file(file_path, fund_nav_dic, cash_dic=None, nav_date=date.today(
     return ret_data_list
 
 
-def read_nav_files(folder_path):
-    fund_dictionay = {}
-    # folder_path = r'D:\WSPycharm\fund_evaluation\contact'
-    file_names = os.listdir(folder_path)
-    for file_name in file_names:
-        # file_path = r'd:\Works\F复华投资\合同、协议\丰润\丰润一期\SK8992_复华丰润稳健一期_估值表_20170113.xls'
-        file_path = os.path.join(folder_path, file_name)
-        file_name_net, file_extension = os.path.splitext(file_path)
-        if file_extension not in ('.xls', '.xlsx'):
-            continue
-        else:
-            data_df = pd.read_excel(file_path, skiprows=1, header=0)
-            # 获取净值
-            data_df1 = pd.read_excel(file_path, skiprows=3, header=0)
-            cum_nav = data_df1['科目名称'][data_df1['科目代码'] == '累计单位净值:']
-            name, nav = data_df.columns[0][13:-6], float(cum_nav.values[0])
-            fund_dictionay[name] = nav
-
-    return fund_dictionay
-
-
 def save_nav_files(data_list, save_path):
     # 创建excel工作表
     workbook = xlwt.Workbook(encoding='utf-8')
@@ -242,7 +242,7 @@ def save_nav_files(data_list, save_path):
             elif key == "volume":
                 style = xlwt.XFStyle()
                 style.num_format_str = '_(#,##0_);(#,##0)'
-                worksheet.write(row_num, 1, value/10000, style)
+                worksheet.write(row_num, 1, value / 10000, style)
             elif key == "setup_date":
                 style = xlwt.XFStyle()
                 style.num_format_str = 'YYYY/M/D'
@@ -274,7 +274,7 @@ def save_nav_files(data_list, save_path):
                         elif key == "volume":
                             style = xlwt.XFStyle()
                             style.num_format_str = '_(#,##0_);(#,##0)'
-                            worksheet.write(row_real_num, 4, value/10000, style)
+                            worksheet.write(row_real_num, 4, value / 10000, style)
                         elif key == "nav":
                             style = xlwt.XFStyle()
                             style.num_format_str = '0.00'
@@ -304,70 +304,16 @@ def save_nav_files(data_list, save_path):
 
 
 if __name__ == "__main__":
-    folder_path = r'd:\WSPych\RefUtils\src\fh_tools\nav_tools\product_nav'
-    fund_nav_dic = read_nav_files(folder_path)
-    file_path = r'D:\WSPych\RefUtils\src\fh_tools\nav_tools\净值计算模板 - 完整版.xls'
-    ret_data_list = update_nav_file(file_path, fund_nav_dic, cash_dic=None)
-    save_path = r'D:\WSPych\RefUtils\src\fh_tools\nav_tools\nav_summary.xls'
-    save_nav_files(ret_data_list, save_path)
-    # print(ret_data_list)
-    # data_list = [
-    #     {
-    #         'product_name': '复华财通定增投资基金',
-    #         'volume': 3924.53,
-    #         'setup_date': str_2_date('2013-12-31'),
-    #         'nav': 1.1492,
-    #         'nav_last': 1.1521,
-    #         'nav_chg': 0.0025,
-    #         'rr': 0.1325,
-    #         'sub_product_list': [
-    #             {
-    #                 'product_name': '展弘稳进1号',
-    #                 'volume': 400.00,
-    #                 'nav': 1.1492,
-    #                 'nav_last': 1.1521,
-    #                 'nav_chg': 0.0025,
-    #                 'rr': 0.1325,
-    #                 'vol_pct': 0.1,  # 持仓比例
-    #             },
-    #             {
-    #                 'product_name': '新萌亮点1号',
-    #                 'volume': 800.00,
-    #                 'nav': 1.1592,
-    #                 'nav_last': 1.1721,
-    #                 'nav_chg': 0.0025,
-    #                 'rr': 0.1425,
-    #                 'vol_pct': 0.2,  # 持仓比例
-    #             },
-    #         ],
-    #     },
-    #     {
-    #         'product_name': '鑫隆稳进FOF',
-    #         'volume': 3924.53,
-    #         'setup_date': str_2_date('2013-12-31'),
-    #         'sub_product_list': [
-    #             {
-    #                 'product_name': '展弘稳进1号',
-    #                 'volume': 400.00,
-    #                 'nav': 1.1492,
-    #                 'nav_last': 1.1521,
-    #                 'nav_chg': 0.0025,
-    #                 'rr': 0.1325,
-    #                 'vol_pct': 0.1,  # 持仓比例
-    #             },
-    #             {
-    #                 'product_name': '新萌亮点1号',
-    #                 'volume': 800.00,
-    #                 'nav': 1.1592,
-    #                 'nav_last': 1.1721,
-    #                 'nav_chg': 0.0025,
-    #                 'rr': 0.1425,
-    #                 'vol_pct': 0.2,  # 持仓比例
-    #             },
-    #         ],
-    #         'nav': 1.1492,
-    #         'nav_last': 1.1521,
-    #         'nav_chg': 0.0025,
-    #         'rr': 0.1325,
-    #     },
-    # ]
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s: %(levelname)s [%(name)s] %(message)s')
+    fund_nav_dic, cash_df = None, None
+    # folder_path = r'd:\WSPych\RefUtils\src\fh_tools\nav_tools\product_nav'
+    # folder_path_evaluation_table = r'D:\WSPycharm\fund_evaluation\evaluation_table'
+    # folder_path_only_nav = r'D:\WSPycharm\fund_evaluation\only_nav'
+    # folder_path_cash = r'D:\WSPycharm\fund_evaluation\cash'
+    # folder_path_dict = {'folder_path_evaluation_table': folder_path_evaluation_table,
+    #                     'folder_path_only_nav': folder_path_only_nav, 'folder_path_cash': folder_path_cash}
+    # fund_nav_dic, cash_df = read_nav_files(folder_path_dict)
+    file_path = r'd:\WSPych\RefUtils\src\nav_tools\净值计算模板 - 模测版.xls'
+    ret_data_list = update_nav_file(file_path, fund_nav_dic, cash_df)
+    # save_path = r'D:\WSPych\RefUtils\src\fh_tools\nav_tools\nav_summary.xls'
+    # save_nav_files(ret_data_list, save_path)
