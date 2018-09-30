@@ -27,6 +27,12 @@ PATTERN_DATE_FORMAT_RESTRICT = re.compile(r"\d{4}(\D)*\d{2}(\D)*\d{2}")
 PATTERN_DATE_FORMAT = re.compile(r"\d{4}(\D)*\d{1,2}(\D)*\d{1,2}")
 
 
+def max_id_val(l: list, func):
+    l_new = [func(x) for x in l]
+    idx = l_new.index(max(l_new))
+    return idx, l[idx]
+
+
 def is_any(iterable, func):
     """
     查找是否存在任何一个为True的结果，否则返回False
