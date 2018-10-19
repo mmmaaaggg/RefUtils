@@ -294,6 +294,8 @@ if __name__ == "__main__":
         file_name = 'latest_price_{0}.csv'.format(datetime.now().strftime('%y-%m-%d %H-%M-%S'))
         file_path = os.path.join(os.path.curdir, 'latest_price', file_name)
         df.to_csv(file_path)
+    except:
+        logger.exception('获取数据异常')
     finally:
         close_sub_process_by_mouse()
         # close_sub_process(sub_process)
