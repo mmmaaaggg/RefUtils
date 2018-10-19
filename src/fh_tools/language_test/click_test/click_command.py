@@ -21,9 +21,16 @@ def foo2():
 func_list = [foo1, foo2]
 promt_str = '   '.join(['%d) %s' % (num, foo.__name__) for num, foo in enumerate(func_list)])
 
+
 @click.command()
 @click.option('--foo', type=click.IntRange(0, len(func_list) - 1), prompt=promt_str)
-def main(foo, **kwargs):
+@click.option('--init', type=click.BOOL, default=False)
+def main(foo, init, **kwargs):
+    if init:
+        print('init')
+    else:
+        print(init)
+
     if foo is None:
         print("None")
     else:
