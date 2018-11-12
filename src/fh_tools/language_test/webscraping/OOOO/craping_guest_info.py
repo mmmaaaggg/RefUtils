@@ -5,25 +5,25 @@ Created on 2017/7/29
 """
 import sys
 import os
-import urllib.request, urllib.error, urllib.parse
-import urllib.request, urllib.parse, urllib.error
+import urllib.request
+import urllib.error
+import urllib.parse
 import http.cookiejar
-import xml.etree.ElementTree as ET
-import random
 from bs4 import BeautifulSoup
 import xlwt
 from collections import OrderedDict
-from datetime import datetime
 import logging
 from logging.handlers import TimedRotatingFileHandler
 from threading import Thread, Lock
 from configparser import ConfigParser
 import time
 import ssl
+
 LOCKER = Lock()
 is_debug = False
 # 全局取消证书验证
 ssl._create_default_https_context = ssl._create_unverified_context
+
 
 def url_opener_builder() -> urllib.request.OpenerDirector:
     """urloper builder"""
@@ -50,7 +50,7 @@ def download_jpg(fileUrl, urlopener: urllib.request.OpenerDirector):
     :param urlopener: 
     :return: 
     """
-    isDownOk = False
+    is_down_ok = False
     try:
         if fileUrl:
             filename = r'code.jpg'
@@ -60,13 +60,13 @@ def download_jpg(fileUrl, urlopener: urllib.request.OpenerDirector):
                 outfile.write(content)
 
             os.startfile(filename)
-            isDownOK = True
+            is_down_ok = True
         else:
             logger.info('ERROR: fileUrl is NULL!')
-    except:
-        isDownOK = False
+    except IOError:
+        is_down_ok = False
 
-    return isDownOK
+    return is_down_ok
 
 
 def login_website(urlopener, username, password, paramstr):
@@ -95,7 +95,7 @@ def login_website(urlopener, username, password, paramstr):
     aobj = soup.find_all('a', attrs={'id': 'LOA6'})
     if len(aobj) == 0:
         logger.info('登录失败  username=%s, password=%s and verifyCode=%s' \
-              % (username, '*' * 8, authcode))  # password
+                    % (username, '*' * 8, authcode))  # password
         return False
     else:
         return True
@@ -142,7 +142,6 @@ def fetch_data_member_list(htmlstr, appenddataset=None):
 
 
 def save_excel(dataset, *args):
-
     book = xlwt.Workbook(encoding='utf-8', style_compression=0)
     try:
         sheet = book.add_sheet('客户记录', cell_overwrite_ok=True)
