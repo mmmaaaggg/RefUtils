@@ -1,7 +1,11 @@
+#! /usr/bin/env python
 # -*- coding:utf-8 -*-
 """
-Created on 2016-12-22
-@author: MG
+@author  : MG
+@Time    : 2016/12/12 14:47
+@File    : mess.py
+@contact : mmmaaaggg@163.com
+@desc    :
 """
 import os
 import time
@@ -18,6 +22,7 @@ import logging
 import warnings
 from functools import reduce
 import xlrd
+import math
 
 logger = logging.getLogger(__name__)
 STR_FORMAT_DATE = '%Y-%m-%d'
@@ -27,10 +32,20 @@ PATTERN_DATE_FORMAT_RESTRICT = re.compile(r"\d{4}(\D)*\d{2}(\D)*\d{2}")
 PATTERN_DATE_FORMAT = re.compile(r"\d{4}(\D)*\d{1,2}(\D)*\d{1,2}")
 
 
-def max_id_val(l: list, func):
-    l_new = [func(x) for x in l]
-    idx = l_new.index(max(l_new))
-    return idx, l[idx]
+def floor(x, precision=0):
+    """带小数位精度控制的 floor"""
+    if precision == 0:
+        return math.floor(x)
+    else:
+        return math.floor(x * (10 ** precision)) / (10 ** precision)
+
+
+def ceil(x, precision=0):
+    """带小数位精度控制的 ceil"""
+    if precision == 0:
+        return math.ceil(x)
+    else:
+        return math.ceil(x * (10 ** precision)) / (10 ** precision)
 
 
 def is_any(iterable, func):
@@ -137,7 +152,9 @@ def log_param_when_exception(func):
     return handler
 
 
-def try_n_times(times=3, sleep_time=3, logger: logging.Logger=None, exception=Exception, exception_sleep_time=0):
+def try_n_times(times=3, sleep_time=3, logger: logging.Logger=None,
+                exception=Exception, exception_sleep_time=0,
+                exception_exclusion_set=None):
     """
     尝试最多 times 次，异常捕获记录后继续尝试
     :param times:
@@ -160,9 +177,13 @@ def try_n_times(times=3, sleep_time=3, logger: logging.Logger=None, exception=Ex
 
                 try:
                     ret_data = func(*arg, **kwargs)
-                except exception:
+                except exception as exp:
                     if logger is not None:
                         logger.exception("第 %d 次调用 %s(%s, %s) 出错", n, func.__name__, arg, kwargs)
+                    if exception_exclusion_set is not None:
+                        for exp_ex in exception_exclusion_set:
+                            if isinstance(exp, exp_ex):
+                                raise exp from exp
                     if exception_sleep_time is not None and exception_sleep_time > 0:
                         time.sleep(exception_sleep_time)
                     continue
@@ -192,8 +213,13 @@ def date_2_str(dt, format=STR_FORMAT_DATE):
 def datetime_2_str(dt, format=STR_FORMAT_DATETIME):
     if dt is not None and type(dt) in (date, datetime, Timestamp):
         dt_str = dt.strftime(format)
+        # print(type(dt), '->', dt_str)
+    elif isinstance(dt, pd.core.indexes.datetimes.DatetimeIndex):
+        dt_str = [x.strftime(STR_FORMAT_DATETIME) for x in dt]
+        # print(type(dt), '-->', dt_str)
     else:
         dt_str = dt
+        # print(type(dt), '没有转换', dt)
     return dt_str
 
 
@@ -1290,3 +1316,17 @@ if __name__ == "__main__":
     #     raise Exception('some error')
     #
     # foo(1, 2, 3, 4, e=5, f=6)
+
+    # 测试 try_n_times
+    @try_n_times(exception_exclusion_set={ValueError}, logger=logger)
+    def foo(n):
+        if n == 2:
+            raise KeyError("key could't be %d" % n)
+        elif n == 3:
+            raise ValueError("value could't be %d" % n)
+        else:
+            return n
+
+    for n in range(5):
+        logger.debug('invoke n=%d', n)
+        foo(n)
