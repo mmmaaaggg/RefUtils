@@ -112,3 +112,4 @@ ENV/
 
 # other persons folder
 src/data_analysis/wang_bo_chuan_transfer_pys/*
+src/fh_tools/language_test/webscraping/OOOO*/config.ini
