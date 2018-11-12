@@ -1,0 +1,17 @@
+celery
+librabbitmq
+eventlet
+numpy
+pandas
+sqlalchemy
+mysqlclient
+xlrd
+xlwt
+DIRestInvoker
+bs4
+tushare
+cryptocmd
+pytdx
+matplotlib
+pyecharts
+pyecharts_snapshot
