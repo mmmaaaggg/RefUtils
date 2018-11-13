@@ -25,6 +25,17 @@ is_debug = False
 # 全局取消证书验证
 ssl._create_default_https_context = ssl._create_unverified_context
 URL_OPEN_TIMEOUT = 20
+format_str = '%(asctime)s %(levelname)s %(name)s %(filename)s.%(funcName)s:%(lineno)d|%(message)s'
+logging.basicConfig(level=logging.DEBUG, format=format_str)
+log_file_handler = TimedRotatingFileHandler(filename="app_log.log", when="D", interval=2, backupCount=10)
+# log_file_handler.suffix = "%Y-%m-%d_%H-%M.log"
+# log_file_handler.extMatch = re.compile(r"^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}.log$")
+log_file_handler.setFormatter(logging.Formatter(format_str))
+log_file_handler.setLevel(logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger()
+logger.addHandler(log_file_handler)
+logger.info(sys.getdefaultencoding())
 
 
 def try_n_times(times=3, sleep_time=3, logger: logging.Logger = None,
@@ -231,9 +242,12 @@ class Downloader(Thread):
     @staticmethod
     @try_n_times(5, exception_sleep_time=3)
     def goto_url(urlopener, url):
-        # 跳转的制定页面，并获取html字符串
+        """跳转的制定页面，并获取html字符串"""
+        logger.debug('goto_url: %s by %s', url, urlopener)
         urlcontent = urlopener.open(urllib.request.Request(url), timeout=URL_OPEN_TIMEOUT)
+        logger.debug('goto_url: %s response.read', url)
         htmlstr = urlcontent.read()  # urlcontent.read(500000)
+        logger.debug('goto_url: %s response.read...(%d)', url, len(htmlstr))
         return htmlstr
 
     @staticmethod
@@ -586,15 +600,4 @@ def main():
 
 
 if __name__ == '__main__':
-    format_str = '%(asctime)s: %(levelname)s [%(name)s:%(funcName)s] %(message)s'
-    # formatter = logging.Formatter(format_str)
-    logging.basicConfig(level=logging.DEBUG, format=format_str)
-    log_file_handler = TimedRotatingFileHandler(filename="app_log.log", when="D", interval=2, backupCount=10)
-    # log_file_handler.suffix = "%Y-%m-%d_%H-%M.log"
-    # log_file_handler.extMatch = re.compile(r"^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}.log$")
-    # log_file_handler.setFormatter(formatter)
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger()
-    logger.addHandler(log_file_handler)
-    logger.info(sys.getdefaultencoding())
     main()
