@@ -20,7 +20,7 @@ import pandas as pd
 from collections import OrderedDict
 import logging
 import warnings
-from functools import reduce
+from functools import reduce, wraps
 import xlrd
 import math
 
@@ -30,6 +30,17 @@ STR_FORMAT_DATETIME = '%Y-%m-%d %H:%M:%S'
 STR_FORMAT_DATETIME2 = '%Y-%m-%d %H:%M:%S.%f'
 PATTERN_DATE_FORMAT_RESTRICT = re.compile(r"\d{4}(\D)*\d{2}(\D)*\d{2}")
 PATTERN_DATE_FORMAT = re.compile(r"\d{4}(\D)*\d{1,2}(\D)*\d{1,2}")
+
+
+def active_coroutine(func):
+    """装饰器：向前执行第一个 yield 表达式，预激活 func"""
+    @wraps(func)
+    def primer(*arg, **kwargs):
+        gen = func(*arg, **kwargs)
+        next(gen)
+        return gen
+
+    return primer
 
 
 def floor(x, precision=0):
