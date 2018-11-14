@@ -3,10 +3,11 @@
 Created on 2018/11/12
 @author: MG
 """
+from src.fh_tools.fh_utils import active_coroutine
 
 
 def averager():
-    print('active func')
+    # print('active func')
     data_list, data_count = [], 0
     while True:
         print('get data')
@@ -28,12 +29,24 @@ def cor():
     return ret
 
 
-def main():
+@active_coroutine
+def cor_activated():
+    print('start cor')
+    ret = yield from averager()
+    print('yield from averager():', ret)
+    return ret
+
+
+def main(auto_active=True):
     data_list = [12, 3, 54, 4]
     print('start main')
-    func = cor()
-    print('next(func)')
-    next(func)
+    if auto_active:
+        func = cor_activated()
+    else:
+        func = cor()
+        print('next(func)')
+        next(func)
+
     try:
         for n in data_list:
             print('func.send(%d)' % n)
