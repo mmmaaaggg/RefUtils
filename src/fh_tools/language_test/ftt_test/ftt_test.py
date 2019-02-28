@@ -6,6 +6,7 @@
 @File    : ftt_test.py
 @contact : mmmaaaggg@163.com
 @desc    : 原文：https://blog.csdn.net/ouening/article/details/71079535
+傅里叶变换
 """
 
 import numpy as np
@@ -69,7 +70,7 @@ def get_func(freq_amplitude_list: list):
     return func
 
 
-yff = get_func([(num, x) for num, x in enumerate(yf2) if x > 1])(x)
+yff = get_func([(num, xx) for num, xx in enumerate(yf2) if xx > 1])(x)
 plt.subplot(326)
 plt.plot(x[0:100], yff[0:100], 'b')
 plt.title('FFT transferred line)', fontsize=10, color='#F08000')
