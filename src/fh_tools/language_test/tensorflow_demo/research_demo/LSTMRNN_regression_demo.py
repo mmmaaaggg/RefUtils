@@ -126,7 +126,7 @@ class LSTMRNN:
             tf.summary.scalar('cost', self.cost)
 
     def msr_error(self, logits, labels):
-        return tf.square(tf.subtract(logits, labels))   # tf.sub(..., ...)
+        return tf.square(tf.subtract(logits, labels))  # tf.sub(..., ...)
 
     def _weight_variable(self, shape, name='weights'):
         initializer = tf.random_normal_initializer(mean=0., stddev=1.)
@@ -193,7 +193,7 @@ def train(plot_batch_or_ion="batch"):
                 writer.add_summary(result, i)
                 if plot_batch_or_ion == 'batch':
                     # default is (6.4, 4.8) for size 640*480 pix
-                    plt.figure(figsize=(10.24, 8))
+                    plt.figure(figsize=(40.96, 8))
                     plt.subplots_adjust(hspace=0.2, wspace=0.2)
                     plt.plot(xs_batch, res_batch, 'r', xs_batch, pred_batch, 'b--', linewidth=1)
                     plt.ylim((-1.2, 1.2))
@@ -203,7 +203,6 @@ def train(plot_batch_or_ion="batch"):
 
 
 if __name__ == "__main__":
-    # get_batch(show_plt=True)
+    get_batch(show_plt=True)
 
     train()
-
