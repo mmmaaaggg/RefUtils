@@ -63,7 +63,6 @@ def get_target_by_future_pct_range(pct_arr: np.ndarray, min_pct: float, max_pct:
             elif result > max_pct:
                 target_arr[i] = 1
                 break
-
     return target_arr
 
 

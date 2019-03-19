@@ -11,7 +11,6 @@ import tensorflow as tf
 import numpy as np
 from tensorflow.examples.tutorials.mnist import input_data
 import matplotlib.pyplot as plt
-from fh_tools.quant import get_target_by_future_pct_range
 
 mnist = input_data.read_data_sets("MNIST_data", one_hot=True)
 BATCH_START = 0
@@ -22,6 +21,34 @@ OUTPUT_SIZE = 1
 CELL_SIZE = 10
 LR = 0.006
 BATCH_START_TEST = 0
+
+
+def get_target_by_future_value(value_arr: np.ndarray, min_pct: float, max_pct: float, max_future=None):
+    """
+    根据时间序列数据 pct_arr 计算每一个时点目标标示 -1 0 1
+    计算方式：当某一点未来波动首先 >（ 或 <） 上届 min_pct（或下届 max_pct），则标记为 1 （或 -1）
+
+    针对当期实例需要，做了一些特殊调整，考虑数值直接是连续的
+    :param pct_arr:
+    :param min_pct:
+    :param max_pct:
+    :param max_future:最大搜索长度
+    :return:
+    """
+    value_arr[np.isnan(value_arr)] = 0
+    arr_len = value_arr.shape[0]
+    target_arr = np.zeros(value_arr.shape)
+    for i in range(arr_len):
+        base = value_arr[i]
+        for j in range(i + 1, arr_len if max_future is None else min(i + 1 + max_future, arr_len)):
+            result = value_arr[j] / base - 1
+            if result < min_pct:
+                target_arr[i] = -1
+                break
+            elif result > max_pct:
+                target_arr[i] = 1
+                break
+    return target_arr
 
 
 def get_batch(show_plt=False):
@@ -40,9 +67,9 @@ def get_batch(show_plt=False):
     # seq = np.zeros((BATCH_SIZE, TIME_STEPS, 2))
     # seq[:, :, 0] = np.sin(xs)
     # seq[:, :, 1] = np.sin(xs - 0.5)
-    seq = np.sin(inputs) + 5
-    res = np.cos(xs)
-    res_label = get_target_by_future_pct_range(res, -0.1, 0.1)
+    seq = np.sin(inputs)
+    res = np.cos(xs) + 5
+    res_label = get_target_by_future_value(res, -0.1, 0.1)
     BATCH_START += TIME_STEPS
     if show_plt:
         plt.plot(xs[0, :], res[0, :], 'r',
@@ -52,7 +79,7 @@ def get_batch(show_plt=False):
                  )
         plt.show()
     # returned seq, res and shape (batch, step, input)
-    return seq, res[:, :, np.newaxis], xs
+    return seq, res_label[:, :, np.newaxis], xs
 
 
 class LSTMRNN:
