@@ -2,16 +2,57 @@
 # -*- coding:utf-8 -*-
 """
 @author  : MG
-@Time    : 2019/02/22 上午10:09
-@File    : rnn_classification_demo.py
+@Time    : 2019/03/19 16:09
+@File    : LSTMRNN_classification_demo.py
 @contact : mmmaaaggg@163.com
 @desc    : 
 """
 import tensorflow as tf
 import numpy as np
 from tensorflow.examples.tutorials.mnist import input_data
+import matplotlib.pyplot as plt
+from fh_tools.quant import get_target_by_future_pct_range
 
 mnist = input_data.read_data_sets("MNIST_data", one_hot=True)
+BATCH_START = 0
+TIME_STEPS = 20
+BATCH_SIZE = 50
+INPUT_SIZE = 2
+OUTPUT_SIZE = 1
+CELL_SIZE = 10
+LR = 0.006
+BATCH_START_TEST = 0
+
+
+def get_batch(show_plt=False):
+    """
+    够在一系列输入输出数据集
+    seq： 两条同频率，不同位移的sin曲线
+    res： 目标是一条cos曲线
+    xs：X 序列
+    """
+    global BATCH_START, TIME_STEPS
+    # xs shape(50 batch, 20 steps)
+    xs = np.arange(BATCH_START, BATCH_START + TIME_STEPS * BATCH_SIZE).reshape((BATCH_SIZE, TIME_STEPS))
+    inputs = np.zeros((BATCH_SIZE, TIME_STEPS, 2))
+    inputs[:, :, 0] = xs
+    inputs[:, :, 1] = xs - 0.5
+    # seq = np.zeros((BATCH_SIZE, TIME_STEPS, 2))
+    # seq[:, :, 0] = np.sin(xs)
+    # seq[:, :, 1] = np.sin(xs - 0.5)
+    seq = np.sin(inputs) + 5
+    res = np.cos(xs)
+    res_label = get_target_by_future_pct_range(res, -0.1, 0.1)
+    BATCH_START += TIME_STEPS
+    if show_plt:
+        plt.plot(xs[0, :], res[0, :], 'r',
+                 xs[0, :], seq[0, :, 0], 'b--',
+                 xs[0, :], seq[0, :, 1], 'b',
+                 xs[0, :], seq[0, :, 1], 'b',
+                 )
+        plt.show()
+    # returned seq, res and shape (batch, step, input)
+    return seq, res[:, :, np.newaxis], xs
 
 
 class LSTMRNN:

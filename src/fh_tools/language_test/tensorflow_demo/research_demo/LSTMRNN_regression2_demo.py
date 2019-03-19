@@ -11,8 +11,6 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-from fh_tools.quant import get_target_by_future_pct_range
-
 BATCH_START = 0
 TIME_STEPS = 20
 BATCH_SIZE = 50
@@ -26,8 +24,8 @@ BATCH_START_TEST = 0
 def get_batch(show_plt=False):
     """
     够在一系列输入输出数据集
-    target： 目标是一条cos曲线
-    res： 两条同频率，不同位移的sin曲线
+    seq： 两条同频率，不同位移的sin曲线
+    res： 目标是一条cos曲线
     xs：X 序列
     """
     global BATCH_START, TIME_STEPS
@@ -39,17 +37,17 @@ def get_batch(show_plt=False):
     # seq = np.zeros((BATCH_SIZE, TIME_STEPS, 2))
     # seq[:, :, 0] = np.sin(xs)
     # seq[:, :, 1] = np.sin(xs - 0.5)
-    target = np.sin(inputs) + 5
-    target = get_target_by_future_pct_range(target, -0.1, 0.1)
+    seq = np.sin(inputs)
+    # target = get_target_by_future_pct_range(target, -0.1, 0.1)
     res = np.cos(xs)
     BATCH_START += TIME_STEPS
     if show_plt:
         plt.plot(xs[0, :], res[0, :], 'r',
-                 xs[0, :], target[0, :, 0], 'b--',
-                 xs[0, :], target[0, :, 1], 'b')
+                 xs[0, :], seq[0, :, 0], 'b--',
+                 xs[0, :], seq[0, :, 1], 'b')
         plt.show()
     # returned seq, res and shape (batch, step, input)
-    return target, res[:, :, np.newaxis], xs
+    return seq, res[:, :, np.newaxis], xs
 
 
 class LSTMRNN:
