@@ -11,8 +11,10 @@ import tensorflow as tf
 import numpy as np
 from tensorflow.examples.tutorials.mnist import input_data
 import matplotlib.pyplot as plt
+import itertools
 
-mnist = input_data.read_data_sets("MNIST_data", one_hot=True)
+
+# mnist = input_data.read_data_sets("MNIST_data", one_hot=True)
 BATCH_START = 0
 TIME_STEPS = 20
 BATCH_SIZE = 50
@@ -29,19 +31,19 @@ def get_target_by_future_value(value_arr: np.ndarray, min_pct: float, max_pct: f
     计算方式：当某一点未来波动首先 >（ 或 <） 上届 min_pct（或下届 max_pct），则标记为 1 （或 -1）
 
     针对当期实例需要，做了一些特殊调整，考虑数值直接是连续的
-    :param pct_arr:
+    :param value_arr:
     :param min_pct:
     :param max_pct:
     :param max_future:最大搜索长度
     :return:
     """
     value_arr[np.isnan(value_arr)] = 0
-    arr_len = value_arr.shape[0]
     target_arr = np.zeros(value_arr.shape)
-    for i in range(arr_len):
-        base = value_arr[i]
-        for j in range(i + 1, arr_len if max_future is None else min(i + 1 + max_future, arr_len)):
-            result = value_arr[j] / base - 1
+    loop_list = list(itertools.product(*[range(x) for x in value_arr.shape]))
+    for num, (i, j) in enumerate(loop_list):
+        base = value_arr[i, j]
+        for i_sub, j_sub in loop_list[(num+1):]:
+            result = value_arr[i_sub, j_sub] / base - 1
             if result < min_pct:
                 target_arr[i] = -1
                 break
@@ -54,32 +56,36 @@ def get_target_by_future_value(value_arr: np.ndarray, min_pct: float, max_pct: f
 def get_batch(show_plt=False):
     """
     够在一系列输入输出数据集
-    seq： 两条同频率，不同位移的sin曲线
-    res： 目标是一条cos曲线
-    xs：X 序列
+    xs： 两条同频率，不同位移的sin曲线
+    ys_value： 目标是一条cos曲线
+    ys: ys_value 未来涨跌标识
+    i_s：X 序列
     """
     global BATCH_START, TIME_STEPS
-    # xs shape(50 batch, 20 steps)
-    xs = np.arange(BATCH_START, BATCH_START + TIME_STEPS * BATCH_SIZE).reshape((BATCH_SIZE, TIME_STEPS))
+    # i_s shape(50 batch, 20 steps)
+    i_s = np.arange(BATCH_START, BATCH_START + TIME_STEPS * BATCH_SIZE).reshape((BATCH_SIZE, TIME_STEPS))
     inputs = np.zeros((BATCH_SIZE, TIME_STEPS, 2))
-    inputs[:, :, 0] = xs
-    inputs[:, :, 1] = xs - 0.5
-    # seq = np.zeros((BATCH_SIZE, TIME_STEPS, 2))
-    # seq[:, :, 0] = np.sin(xs)
-    # seq[:, :, 1] = np.sin(xs - 0.5)
-    seq = np.sin(inputs)
-    res = np.cos(xs) + 5
-    res_label = get_target_by_future_value(res, -0.1, 0.1)
+    inputs[:, :, 0] = i_s
+    inputs[:, :, 1] = i_s - 0.5
+    # xs = np.zeros((BATCH_SIZE, TIME_STEPS, 2))
+    # xs[:, :, 0] = np.sin(i_s)
+    # xs[:, :, 1] = np.sin(i_s - 0.5)
+    xs = np.sin(inputs)
+    # 为了生成 label 需要用到future数据，因此多生成一行数据共生成对应的 label 使用
+    xs_4_res = np.arange(BATCH_START, BATCH_START + TIME_STEPS * (BATCH_SIZE + 1)).reshape((BATCH_SIZE+1, TIME_STEPS))
+    ys_value = np.cos(xs_4_res) + 5
+    ys = get_target_by_future_value(ys_value, -0.1, 0.1)
+    ys = ys[:BATCH_SIZE, -1:]  # ys[:BATCH_SIZE, :] 如果只去最后一个维度数据，则 : 变为 -1:
     BATCH_START += TIME_STEPS
     if show_plt:
-        plt.plot(xs[0, :], res[0, :], 'r',
-                 xs[0, :], seq[0, :, 0], 'b--',
-                 xs[0, :], seq[0, :, 1], 'b',
-                 xs[0, :], seq[0, :, 1], 'b',
+        plt.plot(i_s[0, :], ys_value[0, :], 'r',
+                 i_s[0, :], xs[0, :, 0], 'b--',
+                 i_s[0, :], xs[0, :, 1], 'b',
+                 i_s[0, :], ys[0, 1], 'r',
                  )
         plt.show()
-    # returned seq, res and shape (batch, step, input)
-    return seq, res_label[:, :, np.newaxis], xs
+    # returned xs, ys_value and shape (batch, step, input)
+    return xs, ys, i_s
 
 
 class LSTMRNN:
@@ -143,7 +149,7 @@ class LSTMRNN:
 
     def add_input_layer(self):
         # hidden layer for input to cell
-        # X (128, batch, 28 steps, 28 inputs)
+        # X (128 batch, 28 steps, 28 inputs)
         # ==> X (128 * 28, 28 inputs)
         l_in_x = tf.reshape(self.xs, [-1, self.n_inputs])
         Ws_in = tf.Variable(tf.random_normal([self.n_inputs, self.n_hidden_units]))
@@ -182,14 +188,14 @@ class LSTMRNN:
 
 def train():
     # hyperparameters
-    lr = 0.001
+    lr = LR
     training_iters = 100000
-    batch_size = 128
+    batch_size = BATCH_SIZE
 
-    n_inputs = 28  # MNIST data input (img shape 28*28)
-    n_step = 28  # time steps
-    n_hidden_units = 128  # neurons in hidden layer
-    n_classes = 10  # MNIST classes (0-9 digits)
+    n_inputs = INPUT_SIZE  # MNIST data input (img shape 28*28)
+    n_step = TIME_STEPS  # time steps
+    n_hidden_units = CELL_SIZE  # neurons in hidden layer
+    n_classes = OUTPUT_SIZE  # MNIST classes (0-9 digits)
     model = LSTMRNN(n_step, n_inputs, n_hidden_units, n_classes, lr, batch_size)
     with tf.Session() as sess:
         merged = tf.summary.merge_all()
@@ -200,8 +206,10 @@ def train():
         sess.run(tf.global_variables_initializer())
         step = 0
         while step * model.batch_size < training_iters:
-            batch_xs, batch_ys = mnist.train.next_batch(model.batch_size)
-            batch_xs = batch_xs.reshape([model.batch_size, model.n_step, model.n_inputs])
+            # batch_xs, batch_ys = mnist.train.next_batch(model.batch_size)
+            # batch_xs.shape, batch_ys.shape
+            batch_xs, batch_ys, _ = get_batch()
+            # batch_xs = batch_xs.reshape([model.batch_size, model.n_step, model.n_inputs])
             # feed_dict = {model.xs: batch_xs, model.ys: batch_ys}
             # sess.run(model.train_op, feed_dict=feed_dict)
             if step == 0:
@@ -217,6 +225,7 @@ def train():
                     model.cell_init_state: state,  # use last state as the initial state for this run
                 }
 
+            # sess.run(model.train_op, feed_dict=feed_dict)
             _, cost, state, pred = sess.run(
                 [model.train_op, model.cost, model.cell_final_state, model.pred]
                 , feed_dict=feed_dict
