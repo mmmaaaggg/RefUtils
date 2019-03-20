@@ -6,31 +6,45 @@
 @File    : LSTMRNN_classification_demo.py
 @contact : mmmaaaggg@163.com
 @desc    : 输入双sin曲线，输出cos曲线未来波动是否可能超过 -0.1或 0.1
+根据一组输入（双sin曲线+cos曲线），将其按移动窗口分割成 batch_size 大小的训练集
 """
 import tensorflow as tf
 import numpy as np
 # from tensorflow.examples.tutorials.mnist import input_data
 import matplotlib.pyplot as plt
 import itertools
+from src.fh_tools.fh_utils import get_last_idx
 
 
 # mnist = input_data.read_data_sets("MNIST_data", one_hot=True)
 BATCH_START = 0
 TIME_STEPS = 20
 BATCH_SIZE = 50
-INPUT_SIZE = 2
+INPUT_SIZE = 3
 OUTPUT_SIZE = 1
 CELL_SIZE = 10
 LR = 0.006
 BATCH_START_TEST = 0
 
 
-def get_target_by_future_value(value_arr: np.ndarray, min_pct: float, max_pct: float, max_future=None):
+def get_factors():
+    multiple = 100
+    i_s = np.arange(BATCH_START, BATCH_START + TIME_STEPS * BATCH_SIZE * multiple)
+    factors = np.zeros((BATCH_SIZE * TIME_STEPS * multiple, INPUT_SIZE))
+    factors[:, 0] = np.sin(i_s)                  # sin(x)
+    factors[:, 1] = np.sin(i_s - 0.5)            # sin(x-0.5)
+    factors[:, 2] = price_arr = np.cos(i_s) + 5              # cos(x) + 5
+    labels = get_label_by_future_value(price_arr, -0.1, 0.1)
+    idx_last_available_label = get_last_idx(labels, lambda x: x in (1, -1))
+    factors = factors[:idx_last_available_label + 1, :]
+    labels = labels[:idx_last_available_label]
+    return factors, labels
+
+
+def get_label_by_future_value(value_arr: np.ndarray, min_pct: float, max_pct: float, max_future=None):
     """
     根据时间序列数据 pct_arr 计算每一个时点目标标示 -1 0 1
     计算方式：当某一点未来波动首先 >（ 或 <） 上届 min_pct（或下届 max_pct），则标记为 1 （或 -1）
-
-    针对当期实例需要，做了一些特殊调整，考虑数值直接是连续的
     :param value_arr:
     :param min_pct:
     :param max_pct:
@@ -38,12 +52,12 @@ def get_target_by_future_value(value_arr: np.ndarray, min_pct: float, max_pct: f
     :return:
     """
     value_arr[np.isnan(value_arr)] = 0
-    target_arr = np.zeros(value_arr.shape)
-    loop_list = list(itertools.product(*[range(x) for x in value_arr.shape]))
-    for num, (i, j) in enumerate(loop_list):
-        base = value_arr[i, j]
-        for i_sub, j_sub in loop_list[(num+1):]:
-            result = value_arr[i_sub, j_sub] / base - 1
+    arr_len = value_arr.shape[0]
+    target_arr = np.zeros(arr_len)
+    for i in range(arr_len):
+        base = value_arr[i]
+        for j in range(i+1, arr_len):
+            result = value_arr[j] / base - 1
             if result < min_pct:
                 target_arr[i] = -1
                 break
@@ -53,7 +67,7 @@ def get_target_by_future_value(value_arr: np.ndarray, min_pct: float, max_pct: f
     return target_arr
 
 
-def get_batch(show_plt=False):
+def get_batch(factors: np.ndarray, labels: np.ndarray, shift=2, show_plt=False):
     """
     够在一系列输入输出数据集
     xs： 两条同频率，不同位移的sin曲线
@@ -62,30 +76,33 @@ def get_batch(show_plt=False):
     i_s：X 序列
     """
     global BATCH_START, TIME_STEPS
+
+    xs = np.zeros((BATCH_SIZE, TIME_STEPS, INPUT_SIZE))
+    ys = np.zeros((BATCH_SIZE, OUTPUT_SIZE))
+    available_batch_size, num = 0, 0
+    # print(f"range({BATCH_START}, {factors.shape[0]}, {shift})")
+    for available_batch_size, num in enumerate(range(BATCH_START, factors.shape[0], shift)):
+        tmp = factors[num:num + TIME_STEPS, :]
+        if tmp.shape[0] < TIME_STEPS:
+            break
+        xs[available_batch_size, :, :] = tmp
+        ys[available_batch_size, 0] = labels[num + TIME_STEPS - 1]
+        if available_batch_size + 1 >= BATCH_SIZE:
+            available_batch_size += 1
+            break
+
     # i_s shape(50 batch, 20 steps)
-    i_s = np.arange(BATCH_START, BATCH_START + TIME_STEPS * BATCH_SIZE).reshape((BATCH_SIZE, TIME_STEPS))
-    inputs = np.zeros((BATCH_SIZE, TIME_STEPS, INPUT_SIZE))
-    inputs[:, :, 0] = i_s
-    inputs[:, :, 1] = i_s - 0.5
-    # xs = np.zeros((BATCH_SIZE, TIME_STEPS, 2))
-    # xs[:, :, 0] = np.sin(i_s)
-    # xs[:, :, 1] = np.sin(i_s - 0.5)
-    xs = np.sin(inputs)
-    # 为了生成 label 需要用到future数据，因此多生成一行数据共生成对应的 label 使用
-    xs_4_res = np.arange(BATCH_START, BATCH_START + TIME_STEPS * (BATCH_SIZE + 1)).reshape((BATCH_SIZE+1, TIME_STEPS))
-    ys_value = np.cos(xs_4_res) + 5
-    ys = get_target_by_future_value(ys_value, -0.1, 0.1)
-    ys = ys[:BATCH_SIZE, -1:]  # ys[:BATCH_SIZE, :] 如果只去最后一个维度数据，则 : 变为 -1:
-    BATCH_START += TIME_STEPS
+    BATCH_START = num + shift
     if show_plt:
-        plt.plot(i_s[0, :], ys_value[0, :], 'r',
-                 i_s[0, :], xs[0, :, 0], 'b--',
-                 i_s[0, :], xs[0, :, 1], 'b',
-                 i_s[0, :], ys[0, 1], 'r',
+        xx = list(range(TIME_STEPS))
+        plt.plot(xx, xs[0, :, 0], 'b--',
+                 xx, xs[0, :, 1], 'b',
+                 xx, xs[0, :, 2], 'r',
+                 # xx, ys, 'r--',
                  )
         plt.show()
     # returned xs, ys_value and shape (batch, step, input)
-    return xs, ys, i_s
+    return xs, ys, available_batch_size
 
 
 class LSTMRNN:
@@ -187,6 +204,7 @@ class LSTMRNN:
 
 
 def train():
+    factors, labels = get_factors()
     # hyperparameters
     lr = LR
     training_iters = 100000
@@ -208,7 +226,10 @@ def train():
         while step * model.batch_size < training_iters:
             # batch_xs, batch_ys = mnist.train.next_batch(model.batch_size)
             # batch_xs.shape, batch_ys.shape
-            batch_xs, batch_ys, _ = get_batch()
+            batch_xs, batch_ys, available_batch_size = get_batch(factors, labels)
+            # print("available_batch_size", available_batch_size)
+            if available_batch_size < model.batch_size:
+                break
             # batch_xs = batch_xs.reshape([model.batch_size, model.n_step, model.n_inputs])
             # feed_dict = {model.xs: batch_xs, model.ys: batch_ys}
             # sess.run(model.train_op, feed_dict=feed_dict)
