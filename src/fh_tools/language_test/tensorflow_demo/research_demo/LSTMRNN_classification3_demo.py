@@ -3,18 +3,17 @@
 """
 @author  : MG
 @Time    : 2019/03/19 16:09
-@File    : LSTMRNN_classification_demo.py
+@File    : LSTMRNN_classification3_demo.py
 @contact : mmmaaaggg@163.com
-@desc    : 输入双sin曲线，输出cos曲线未来波动是否可能超过 -0.1或 0.1
+@desc    : 期货连续合约量价数据，输出前复权价格未来波动是否可能超过 -1%或 1%
 根据一组输入（双sin曲线+cos曲线），将其按移动窗口分割成 batch_size 大小的训练集
 """
 import tensorflow as tf
 import numpy as np
 # from tensorflow.examples.tutorials.mnist import input_data
 import matplotlib.pyplot as plt
-import itertools
 from src.fh_tools.fh_utils import get_last_idx
-
+import pandas as pd
 
 # mnist = input_data.read_data_sets("MNIST_data", one_hot=True)
 BATCH_START = 0
@@ -28,13 +27,16 @@ BATCH_START_TEST = 0
 
 
 def get_factors():
-    multiple = 100
-    i_s = np.arange(BATCH_START, BATCH_START + TIME_STEPS * BATCH_SIZE * multiple)
-    factors = np.zeros((BATCH_SIZE * TIME_STEPS * multiple, INPUT_SIZE))
-    factors[:, 0] = np.sin(i_s)                  # sin(x)
-    factors[:, 1] = np.sin(i_s - 0.5)            # sin(x-0.5)
-    factors[:, 2] = price_arr = np.cos(i_s) + 5              # cos(x) + 5
-    labels = get_label_by_future_value(price_arr, -0.1, 0.1)
+    global INPUT_SIZE
+    # '/home/mg/github/RefUtils/src/fh_tools/language_test/tensorflow_demo/research_demo/RU_continuous_adj.csv'
+    file_path = r'RU_continuous_adj.csv'
+    df = pd.read_csv(file_path, index_col=0)
+    df = df[~df['close'].isnull()][['close', 'TermStructure', 'Volume', 'OI']]
+
+    factors = df.to_numpy()
+    price_arr = factors[:, 0]
+    INPUT_SIZE = factors.shape[1]
+    labels = get_label_by_future_value(price_arr, -0.01, 0.01)
     idx_last_available_label = get_last_idx(labels, lambda x: x.sum() == 0)
     factors = factors[:idx_last_available_label + 1, :]
     labels = labels[:idx_last_available_label + 1, :]
@@ -80,7 +82,7 @@ def get_batch(factors: np.ndarray, labels: np.ndarray, shift=2, show_plt=False):
     xs = np.zeros((BATCH_SIZE, TIME_STEPS, INPUT_SIZE))
     ys = np.zeros((BATCH_SIZE, OUTPUT_SIZE))
     available_batch_size, num = 0, 0
-    # print(f"range({BATCH_START}, {factors.shape[0]}, {shift})")
+    print(f"range({BATCH_START}, {factors.shape[0]}, {shift})")
     for available_batch_size, num in enumerate(range(BATCH_START, factors.shape[0], shift)):
         tmp = factors[num:num + TIME_STEPS, :]
         if tmp.shape[0] < TIME_STEPS:
@@ -253,7 +255,7 @@ def train():
             )
 
             if step % 20 == 0:
-                # batch_xs, batch_ys, _ = get_batch()
+                # batch_xs, batch_ys, _ = get_batch(factors, labels)
                 # if step == 0:
                 #     feed_dict = {
                 #         model.xs: batch_xs,
