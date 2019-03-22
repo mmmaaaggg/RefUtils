@@ -19,18 +19,16 @@ BATCH_START = 0
 TIME_STEPS = 20
 BATCH_SIZE = 50
 INPUT_SIZE = 2
-OUTPUT_SIZE = 1
+OUTPUT_SIZE = 2
 CELL_SIZE = 10
 LR = 0.006
 BATCH_START_TEST = 0
 
 
-def get_target_by_future_value(value_arr: np.ndarray, min_pct: float, max_pct: float, max_future=None):
+def get_label_by_future_value(value_arr: np.ndarray, min_pct: float, max_pct: float, max_future=None):
     """
     根据时间序列数据 pct_arr 计算每一个时点目标标示 -1 0 1
     计算方式：当某一点未来波动首先 >（ 或 <） 上届 min_pct（或下届 max_pct），则标记为 1 （或 -1）
-
-    针对当期实例需要，做了一些特殊调整，考虑数值直接是连续的
     :param value_arr:
     :param min_pct:
     :param max_pct:
@@ -38,17 +36,17 @@ def get_target_by_future_value(value_arr: np.ndarray, min_pct: float, max_pct: f
     :return:
     """
     value_arr[np.isnan(value_arr)] = 0
-    target_arr = np.zeros(value_arr.shape)
-    loop_list = list(itertools.product(*[range(x) for x in value_arr.shape]))
-    for num, (i, j) in enumerate(loop_list):
-        base = value_arr[i, j]
-        for i_sub, j_sub in loop_list[(num+1):]:
-            result = value_arr[i_sub, j_sub] / base - 1
+    arr_len = value_arr.shape[0]
+    target_arr = np.zeros((arr_len, OUTPUT_SIZE))
+    for i in range(arr_len):
+        base = value_arr[i]
+        for j in range(i+1, arr_len):
+            result = value_arr[j] / base - 1
             if result < min_pct:
-                target_arr[i] = -1
+                target_arr[i, 0] = 1
                 break
             elif result > max_pct:
-                target_arr[i] = 1
+                target_arr[i, 1] = 1
                 break
     return target_arr
 
@@ -72,16 +70,16 @@ def get_batch(show_plt=False):
     # xs[:, :, 1] = np.sin(i_s - 0.5)
     xs = np.sin(inputs)
     # 为了生成 label 需要用到future数据，因此多生成一行数据共生成对应的 label 使用
-    xs_4_res = np.arange(BATCH_START, BATCH_START + TIME_STEPS * (BATCH_SIZE + 1)).reshape((BATCH_SIZE+1, TIME_STEPS))
+    xs_4_res = np.arange(BATCH_START, BATCH_START + TIME_STEPS * (BATCH_SIZE + 1))
     ys_value = np.cos(xs_4_res) + 5
-    ys = get_target_by_future_value(ys_value, -0.1, 0.1)
-    ys = ys[:BATCH_SIZE, -1:]  # ys[:BATCH_SIZE, :] 如果只去最后一个维度数据，则 : 变为 -1:
+    ys = get_label_by_future_value(ys_value, -0.1, 0.1)
+    ys = ys[range(TIME_STEPS + 1, TIME_STEPS * BATCH_SIZE + 2, TIME_STEPS), :]
     BATCH_START += TIME_STEPS
     if show_plt:
         plt.plot(i_s[0, :], ys_value[0, :], 'r',
                  i_s[0, :], xs[0, :, 0], 'b--',
                  i_s[0, :], xs[0, :, 1], 'b',
-                 i_s[0, :], ys[0, 1], 'r',
+                 i_s[0, :], ys[:, 0] * (-1) + ys[:, 1], 'r',
                  )
         plt.show()
     # returned xs, ys_value and shape (batch, step, input)
