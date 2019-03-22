@@ -167,12 +167,12 @@ class LSTMRNN:
         # hidden layer for input to cell
         # X (128 batch, 28 steps, 28 inputs)
         # ==> X (128 * 28, 28 inputs)
-        l_in_x = tf.reshape(self.xs, [-1, self.n_inputs])
-        Ws_in = tf.Variable(tf.random_normal([self.n_inputs, self.n_hidden_units]))
-        bs_in = tf.Variable(tf.constant(0.1, shape=[self.n_hidden_units, ]))
+        self.l_in_x = tf.reshape(self.xs, [-1, self.n_inputs])
+        self.Ws_in = tf.Variable(tf.random_normal([self.n_inputs, self.n_hidden_units]))
+        self.bs_in = tf.Variable(tf.constant(0.1, shape=[self.n_hidden_units, ]))
         # ==> X_in (128 batch * 28 steps, 128 hidden)
         with tf.name_scope('Wx_plus_b'):
-            l_in_y = tf.matmul(l_in_x, Ws_in) + bs_in
+            l_in_y = tf.matmul(self.l_in_x, self.Ws_in) + self.bs_in
         # ==> X_in (128 batch, 28 steps, 128 hidden)
         self.l_in_y = tf.reshape(l_in_y, [-1, self.n_step, self.n_hidden_units])
 
@@ -191,10 +191,10 @@ class LSTMRNN:
         # results = tf.matmul(states[1], weights['out']) + biases['out']  # states[1] is m_state
         # method 2
         # unpack to list[(batch, outputs)...] * steps
-        l_out_x = tf.unstack(tf.transpose(self.cell_outputs, [1, 0, 2]))  # states is the last outputs
-        Ws_out = tf.Variable(tf.random_normal([self.n_hidden_units, self.n_classes]))
-        bs_out = tf.Variable(tf.constant(0.1, shape=[self.n_classes, ]))
-        self.pred = tf.matmul(l_out_x[-1], Ws_out) + bs_out
+        self.l_out_x = tf.unstack(tf.transpose(self.cell_outputs, [1, 0, 2]))  # states is the last outputs
+        self.Ws_out = tf.Variable(tf.random_normal([self.n_hidden_units, self.n_classes]))
+        self.bs_out = tf.Variable(tf.constant(0.1, shape=[self.n_classes, ]))
+        self.pred = tf.matmul(self.l_out_x[-1], self.Ws_out) + self.bs_out
 
     def compute_cost(self):
         self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(
@@ -271,6 +271,29 @@ def train():
 
             step += 1
 
+        saver = tf.train.Saver()
+        save_path = saver.save(sess, r"my_net/save_net.ckpt")
+        print("Save to path:", save_path)
+    return model, state
+
+
+def predict(model: LSTMRNN, state):
+    print('开始预测')
+    saver = tf.train.Saver()
+    with tf.Session() as sess:
+        saver.restore(sess, r"my_net/save_net.ckpt")
+        factors, labels = get_factors()
+        print("批量预测")
+        batch_xs, batch_ys, _ = get_batch(factors, labels)
+        feed_dict = {
+            model.xs: batch_xs,
+            model.ys: batch_ys,
+            model.cell_init_state: state,  # use last state as the initial state for this run
+        }
+        print("pred:\n", sess.run(tf.argmax(model.pred, 1), feed_dict))
+
 
 if __name__ == '__main__':
-    train()
+    model, state = train()
+    BATCH_START = 0
+    predict(model, state)

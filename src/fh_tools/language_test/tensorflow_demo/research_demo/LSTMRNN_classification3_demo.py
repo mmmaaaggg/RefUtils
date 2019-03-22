@@ -27,6 +27,23 @@ LR = 0.006
 BATCH_START_TEST = 0
 
 
+def get_factors():
+    global INPUT_SIZE
+    # '/home/mg/github/RefUtils/src/fh_tools/language_test/tensorflow_demo/research_demo/RU_continuous_adj.csv'
+    file_path = r'RU_continuous_adj.csv'
+    df = pd.read_csv(file_path, index_col=0)
+    df = df[~df['close'].isnull()][['close', 'TermStructure', 'Volume', 'OI']]
+
+    factors = df.to_numpy()
+    price_arr = factors[:, 0]
+    INPUT_SIZE = factors.shape[1]
+    labels = get_label_by_future_value(price_arr, -0.01, 0.01)
+    idx_last_available_label = get_last_idx(labels, lambda x: x.sum() == 0)
+    factors = factors[:idx_last_available_label + 1, :]
+    labels = labels[:idx_last_available_label + 1, :]
+    return factors, labels
+
+
 def get_label_by_future_value(value_arr: np.ndarray, min_pct: float, max_pct: float, max_future=None):
     """
     根据时间序列数据 pct_arr 计算每一个时点目标标示 -1 0 1
@@ -53,23 +70,6 @@ def get_label_by_future_value(value_arr: np.ndarray, min_pct: float, max_pct: fl
     return target_arr
 
 
-def get_factors():
-    global INPUT_SIZE
-    # '/home/mg/github/RefUtils/src/fh_tools/language_test/tensorflow_demo/research_demo/RU_continuous_adj.csv'
-    file_path = r'RU_continuous_adj.csv'
-    df = pd.read_csv(file_path, index_col=0)
-    df = df[~df['close'].isnull()][['close', 'TermStructure', 'Volume', 'OI']]
-
-    factors = df.to_numpy()
-    price_arr = factors[:, 0]
-    INPUT_SIZE = factors.shape[1]
-    labels = get_label_by_future_value(price_arr, -0.01, 0.01)
-    idx_last_available_label = get_last_idx(labels, lambda x: x.sum() == 0)
-    factors = factors[:idx_last_available_label + 1, :]
-    labels = labels[:idx_last_available_label + 1, :]
-    return factors, labels
-
-
 def get_batch(factors: np.ndarray, labels: np.ndarray, shift=2, show_plt=False):
     """
     够在一系列输入输出数据集
@@ -83,7 +83,7 @@ def get_batch(factors: np.ndarray, labels: np.ndarray, shift=2, show_plt=False):
     xs = np.zeros((BATCH_SIZE, TIME_STEPS, INPUT_SIZE))
     ys = np.zeros((BATCH_SIZE, OUTPUT_SIZE))
     available_batch_size, num = 0, 0
-    print(f"range({BATCH_START}, {factors.shape[0]}, {shift})")
+    # print(f"range({BATCH_START}, {factors.shape[0]}, {shift})")
     for available_batch_size, num in enumerate(range(BATCH_START, factors.shape[0], shift)):
         tmp = factors[num:num + TIME_STEPS, :]
         if tmp.shape[0] < TIME_STEPS:
