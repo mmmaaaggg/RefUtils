@@ -6,7 +6,7 @@
 @File    : LSTMRNN_classification3_demo.py
 @contact : mmmaaaggg@163.com
 @desc    : 期货连续合约量价数据，输出前复权价格未来波动是否可能超过 -1%或 1%
-根据一组输入（双sin曲线+cos曲线），将其按移动窗口分割成 batch_size 大小的训练集
+将其按移动窗口分割成 batch_size 大小的训练集
 """
 import tensorflow as tf
 import numpy as np
@@ -14,6 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from src.fh_tools.fh_utils import get_last_idx
 import pandas as pd
+import random
 
 # mnist = input_data.read_data_sets("MNIST_data", one_hot=True)
 BATCH_START = 0
@@ -24,23 +25,6 @@ OUTPUT_SIZE = 2
 CELL_SIZE = 10
 LR = 0.006
 BATCH_START_TEST = 0
-
-
-def get_factors():
-    global INPUT_SIZE
-    # '/home/mg/github/RefUtils/src/fh_tools/language_test/tensorflow_demo/research_demo/RU_continuous_adj.csv'
-    file_path = r'RU_continuous_adj.csv'
-    df = pd.read_csv(file_path, index_col=0)
-    df = df[~df['close'].isnull()][['close', 'TermStructure', 'Volume', 'OI']]
-
-    factors = df.to_numpy()
-    price_arr = factors[:, 0]
-    INPUT_SIZE = factors.shape[1]
-    labels = get_label_by_future_value(price_arr, -0.01, 0.01)
-    idx_last_available_label = get_last_idx(labels, lambda x: x.sum() == 0)
-    factors = factors[:idx_last_available_label + 1, :]
-    labels = labels[:idx_last_available_label + 1, :]
-    return factors, labels
 
 
 def get_label_by_future_value(value_arr: np.ndarray, min_pct: float, max_pct: float, max_future=None):
@@ -67,6 +51,23 @@ def get_label_by_future_value(value_arr: np.ndarray, min_pct: float, max_pct: fl
                 target_arr[i, 1] = 1
                 break
     return target_arr
+
+
+def get_factors():
+    global INPUT_SIZE
+    # '/home/mg/github/RefUtils/src/fh_tools/language_test/tensorflow_demo/research_demo/RU_continuous_adj.csv'
+    file_path = r'RU_continuous_adj.csv'
+    df = pd.read_csv(file_path, index_col=0)
+    df = df[~df['close'].isnull()][['close', 'TermStructure', 'Volume', 'OI']]
+
+    factors = df.to_numpy()
+    price_arr = factors[:, 0]
+    INPUT_SIZE = factors.shape[1]
+    labels = get_label_by_future_value(price_arr, -0.01, 0.01)
+    idx_last_available_label = get_last_idx(labels, lambda x: x.sum() == 0)
+    factors = factors[:idx_last_available_label + 1, :]
+    labels = labels[:idx_last_available_label + 1, :]
+    return factors, labels
 
 
 def get_batch(factors: np.ndarray, labels: np.ndarray, shift=2, show_plt=False):
@@ -103,6 +104,32 @@ def get_batch(factors: np.ndarray, labels: np.ndarray, shift=2, show_plt=False):
                  # xx, ys, 'r--',
                  )
         plt.show()
+    # returned xs, ys_value and shape (batch, step, input)
+    return xs, ys, available_batch_size
+
+
+def get_batch_by_random(factors: np.ndarray, labels: np.ndarray):
+    """
+    够在一系列输入输出数据集
+    xs： 两条同频率，不同位移的sin曲线
+    ys_value： 目标是一条cos曲线
+    ys: ys_value 未来涨跌标识
+    i_s：X 序列
+    """
+    xs = np.zeros((BATCH_SIZE, TIME_STEPS, INPUT_SIZE))
+    ys = np.zeros((BATCH_SIZE, OUTPUT_SIZE))
+    available_batch_size, num = 0, 0
+    samples = random.sample(range(factors.shape[0] - TIME_STEPS), BATCH_SIZE)
+    for available_batch_size, num in enumerate(samples):
+        tmp = factors[num:num + TIME_STEPS, :]
+        if tmp.shape[0] < TIME_STEPS:
+            break
+        xs[available_batch_size, :, :] = tmp
+        ys[available_batch_size, :] = labels[num + TIME_STEPS - 1, :]
+        if available_batch_size + 1 >= BATCH_SIZE:
+            available_batch_size += 1
+            break
+
     # returned xs, ys_value and shape (batch, step, input)
     return xs, ys, available_batch_size
 
@@ -170,12 +197,12 @@ class LSTMRNN:
         # hidden layer for input to cell
         # X (128 batch, 28 steps, 28 inputs)
         # ==> X (128 * 28, 28 inputs)
-        l_in_x = tf.reshape(self.xs, [-1, self.n_inputs])
-        Ws_in = tf.Variable(tf.random_normal([self.n_inputs, self.n_hidden_units]))
-        bs_in = tf.Variable(tf.constant(0.1, shape=[self.n_hidden_units, ]))
+        self.l_in_x = tf.reshape(self.xs, [-1, self.n_inputs])
+        self.Ws_in = tf.Variable(tf.random_normal([self.n_inputs, self.n_hidden_units]))
+        self.bs_in = tf.Variable(tf.constant(0.1, shape=[self.n_hidden_units, ]))
         # ==> X_in (128 batch * 28 steps, 128 hidden)
         with tf.name_scope('Wx_plus_b'):
-            l_in_y = tf.matmul(l_in_x, Ws_in) + bs_in
+            l_in_y = tf.matmul(self.l_in_x, self.Ws_in) + self.bs_in
         # ==> X_in (128 batch, 28 steps, 128 hidden)
         self.l_in_y = tf.reshape(l_in_y, [-1, self.n_step, self.n_hidden_units])
 
@@ -194,10 +221,10 @@ class LSTMRNN:
         # results = tf.matmul(states[1], weights['out']) + biases['out']  # states[1] is m_state
         # method 2
         # unpack to list[(batch, outputs)...] * steps
-        l_out_x = tf.unstack(tf.transpose(self.cell_outputs, [1, 0, 2]))  # states is the last outputs
-        Ws_out = tf.Variable(tf.random_normal([self.n_hidden_units, self.n_classes]))
-        bs_out = tf.Variable(tf.constant(0.1, shape=[self.n_classes, ]))
-        self.pred = tf.matmul(l_out_x[-1], Ws_out) + bs_out
+        self.l_out_x = tf.unstack(tf.transpose(self.cell_outputs, [1, 0, 2]))  # states is the last outputs
+        self.Ws_out = tf.Variable(tf.random_normal([self.n_hidden_units, self.n_classes]))
+        self.bs_out = tf.Variable(tf.constant(0.1, shape=[self.n_classes, ]))
+        self.pred = tf.matmul(self.l_out_x[-1], self.Ws_out) + self.bs_out
 
     def compute_cost(self):
         self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(
@@ -207,6 +234,7 @@ class LSTMRNN:
 
 def train():
     factors, labels = get_factors()
+    state = None
     # hyperparameters
     lr = LR
     training_iters = 100000
@@ -228,9 +256,11 @@ def train():
         while step * model.batch_size < training_iters:
             # batch_xs, batch_ys = mnist.train.next_batch(model.batch_size)
             # batch_xs.shape, batch_ys.shape
+            # batch_xs, batch_ys, available_batch_size = get_batch(factors, labels)
             batch_xs, batch_ys, available_batch_size = get_batch(factors, labels)
             # print("available_batch_size", available_batch_size)
             if available_batch_size < model.batch_size:
+                print("available_batch_size=", available_batch_size, "退出训练")
                 break
             # batch_xs = batch_xs.reshape([model.batch_size, model.n_step, model.n_inputs])
             # feed_dict = {model.xs: batch_xs, model.ys: batch_ys}
@@ -274,6 +304,28 @@ def train():
 
             step += 1
 
+        saver = tf.train.Saver()
+        save_path = saver.save(sess, r"my_net/save_net.ckpt")
+        print("Save to path:", save_path)
+    return model, state
+
+
+def predict(model: LSTMRNN, state):
+    print('开始预测')
+    saver = tf.train.Saver()
+    with tf.Session() as sess:
+        saver.restore(sess, r"my_net/save_net.ckpt")
+        factors, labels = get_factors()
+        batch_xs, batch_ys, _ = get_batch(factors, labels)
+        feed_dict = {
+            model.xs: batch_xs,
+            model.ys: batch_ys,
+            model.cell_init_state: state,  # use last state as the initial state for this run
+        }
+        pred = sess.run(model.pred, feed_dict)
+        print("pred:", pred)
+
 
 if __name__ == '__main__':
-    train()
+    model, state = train()
+    # predict(model, state)

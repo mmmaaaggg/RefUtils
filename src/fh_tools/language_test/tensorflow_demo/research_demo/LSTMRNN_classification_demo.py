@@ -173,10 +173,10 @@ class LSTMRNN:
         # results = tf.matmul(states[1], weights['out']) + biases['out']  # states[1] is m_state
         # method 2
         # unpack to list[(batch, outputs)...] * steps
-        l_out_x = tf.unstack(tf.transpose(self.cell_outputs, [1, 0, 2]))  # states is the last outputs
-        Ws_out = tf.Variable(tf.random_normal([self.n_hidden_units, self.n_classes]))
-        bs_out = tf.Variable(tf.constant(0.1, shape=[self.n_classes, ]))
-        self.pred = tf.matmul(l_out_x[-1], Ws_out) + bs_out
+        self.l_out_x = tf.unstack(tf.transpose(self.cell_outputs, [1, 0, 2]))  # states is the last outputs
+        self.Ws_out = tf.Variable(tf.random_normal([self.n_hidden_units, self.n_classes]))
+        self.bs_out = tf.Variable(tf.constant(0.1, shape=[self.n_classes, ]))
+        self.pred = tf.matmul(self.l_out_x[-1], self.Ws_out) + self.bs_out
 
     def compute_cost(self):
         self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(

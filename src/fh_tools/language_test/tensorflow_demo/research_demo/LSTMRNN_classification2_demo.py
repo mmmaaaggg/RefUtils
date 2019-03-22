@@ -98,7 +98,6 @@ def get_batch(factors: np.ndarray, labels: np.ndarray, shift=2, show_plt=False):
         plt.plot(xx, xs[0, :, 0], 'b--',
                  xx, xs[0, :, 1], 'b',
                  xx, xs[0, :, 2], 'r',
-                 # xx, ys, 'r--',
                  )
         plt.show()
     # returned xs, ys_value and shape (batch, step, input)
