@@ -30,8 +30,10 @@ def get_factors():
     multiple = 100
     i_s = np.arange(BATCH_START, BATCH_START + TIME_STEPS * BATCH_SIZE * multiple)
     factors = np.zeros((BATCH_SIZE * TIME_STEPS * multiple, INPUT_SIZE))
-    factors[:, 0] = np.sin(i_s)                  # sin(x)
-    factors[:, 1] = np.sin(i_s - 0.5)            # sin(x-0.5)
+    # + 100 后出现分类预测无法计算的问，主要是由于数值过大造成梯度爆炸或梯度消失问题
+    # 解决方案是将其进行 batch normalization
+    factors[:, 0] = np.sin(i_s) + 100                  # sin(x)
+    factors[:, 1] = np.sin(i_s - 0.5) + 100            # sin(x-0.5)
     factors[:, 2] = price_arr = np.cos(i_s) + 5              # cos(x) + 5
     labels = get_label_by_future_value(price_arr, -0.1, 0.1)
     idx_last_available_label = get_last_idx(labels, lambda x: x.sum() == 0)
@@ -133,6 +135,7 @@ class LSTMRNN:
             # tf Graph input
             self.xs = tf.placeholder(tf.float32, [None, n_step, n_inputs])
             self.ys = tf.placeholder(tf.float32, [None, n_classes])
+            self.is_training = tf.placeholder(tf.bool, [])
 
         # Define weights
         self.weights = {
@@ -172,6 +175,8 @@ class LSTMRNN:
         # ==> X_in (128 batch * 28 steps, 128 hidden)
         with tf.name_scope('Wx_plus_b'):
             l_in_y = tf.matmul(self.l_in_x, self.Ws_in) + self.bs_in
+            l_in_y = tf.layers.batch_normalization(l_in_y, training=self.is_training)
+
         # ==> X_in (128 batch, 28 steps, 128 hidden)
         self.l_in_y = tf.reshape(l_in_y, [-1, self.n_step, self.n_hidden_units])
 
@@ -228,17 +233,11 @@ def train():
             # batch_xs = batch_xs.reshape([model.batch_size, model.n_step, model.n_inputs])
             # feed_dict = {model.xs: batch_xs, model.ys: batch_ys}
             # sess.run(model.train_op, feed_dict=feed_dict)
-            if step == 0:
-                feed_dict = {
-                    model.xs: batch_xs,
-                    model.ys: batch_ys,
-                    # create initial state
-                }
-            else:
-                feed_dict = {
-                    model.xs: batch_xs,
-                    model.ys: batch_ys,
-                }
+            feed_dict = {
+                model.xs: batch_xs,
+                model.ys: batch_ys,
+                model.is_training: True,
+            }
 
             # sess.run(model.train_op, feed_dict=feed_dict)
             _, cost, state, pred = sess.run(
@@ -248,18 +247,17 @@ def train():
 
             if step % 20 == 0:
                 # batch_xs, batch_ys, _ = get_batch()
-                # if step == 0:
                 #     feed_dict = {
                 #         model.xs: batch_xs,
                 #         model.ys: batch_ys,
                 #         # create initial state
                 #     }
-                # else:
-                #     feed_dict = {
-                #         model.xs: batch_xs,
-                #         model.ys: batch_ys,
-                #         model.cell_init_state: state,  # use last state as the initial state for this run
-                #     }
+                feed_dict = {
+                    model.xs: batch_xs,
+                    model.ys: batch_ys,
+                    model.is_training: True,
+                    # TODO: model.is_training should be False
+                }
                 print(sess.run(model.accuracy_op, feed_dict=feed_dict))
                 result = sess.run(merged, feed_dict)
                 writer.add_summary(result, step)
@@ -283,6 +281,8 @@ def predict(model: LSTMRNN):
         feed_dict = {
             model.xs: batch_xs,
             model.ys: batch_ys,
+            model.is_training: True,
+            # TODO: model.is_training should be False
         }
         pred = sess.run(tf.argmax(model.pred, 1), feed_dict)
         print("pred:\n", pred)
@@ -296,6 +296,8 @@ def predict(model: LSTMRNN):
             feed_dict = {
                 model.xs: batch_xs[n:n+1, :, :],
                 model.ys: batch_ys[n:n+1, :],
+                model.is_training: True,
+                # TODO: model.is_training should be False
             }
             pred = sess.run(tf.argmax(model.pred, 1), feed_dict)
             pred_all.extend(pred)
