@@ -138,7 +138,7 @@ def get_batch_by_random(factors: np.ndarray, labels: np.ndarray):
 
 
 class LSTMRNN:
-    def __init__(self, n_step, n_inputs, n_hidden_units, n_classes, lr, batch_size):
+    def __init__(self, n_step, n_inputs, n_hidden_units, n_classes, lr, batch_size, normalization_model):
         """
 
         :param n_step: time steps
@@ -148,6 +148,7 @@ class LSTMRNN:
         :param lr:
         :param training_iters:
         :param batch_size:
+        :param normalization_model:
         """
         self.n_step = n_step
         self.n_inputs = n_inputs
@@ -156,6 +157,7 @@ class LSTMRNN:
         # hyperparameters
         self.lr = lr
         self.batch_size = batch_size
+        self.normalization_model = normalization_model
         # attributes defined in other functions
         self.cost = None
         self.l_in_y = None
@@ -207,7 +209,8 @@ class LSTMRNN:
         # ==> X_in (128 batch * 28 steps, 128 hidden)
         with tf.name_scope('Wx_plus_b'):
             l_in_y = tf.matmul(self.l_in_x, self.Ws_in) + self.bs_in
-            l_in_y = tf.layers.batch_normalization(l_in_y, training=self.is_training)
+            if self.normalization_model:
+                l_in_y = tf.layers.batch_normalization(l_in_y, training=self.is_training)
 
         # ==> X_in (128 batch, 28 steps, 128 hidden)
         self.l_in_y = tf.reshape(l_in_y, [-1, self.n_step, self.n_hidden_units])
@@ -235,7 +238,7 @@ class LSTMRNN:
         tf.summary.scalar('cost', self.cost)
 
 
-def build_model():
+def build_model(normalization_model):
     # hyperparameters
     lr = LR
     batch_size = BATCH_SIZE
@@ -244,12 +247,12 @@ def build_model():
     n_step = TIME_STEPS         # time steps
     n_hidden_units = CELL_SIZE  # neurons in hidden layer
     n_classes = OUTPUT_SIZE     # MNIST classes (0-9 digits)
-    model = LSTMRNN(n_step, n_inputs, n_hidden_units, n_classes, lr, batch_size)
+    model = LSTMRNN(n_step, n_inputs, n_hidden_units, n_classes, lr, batch_size, normalization_model)
     return model
 
 
-def train(model):
-    factors, labels = get_factors()
+def train(model, normalization_factor=False):
+    factors, labels = get_factors(normalization_factor)
     training_iters = 100000
 
     with tf.Session() as sess:
@@ -299,17 +302,17 @@ def train(model):
             step += 1
 
         saver = tf.train.Saver()
-        save_path = saver.save(sess, r"my_net/save_net.ckpt")
+        save_path = saver.save(sess, f"my_net/save_net_{normalization_model}.ckpt")
         print("Save to path:", save_path)
     return model
 
 
-def predict(model: LSTMRNN):
+def predict(model: LSTMRNN, normalization_factor=False):
     print('开始预测')
     saver = tf.train.Saver()
     with tf.Session() as sess:
-        saver.restore(sess, r"my_net/save_net.ckpt")
-        factors, labels = get_factors()
+        saver.restore(sess, f"my_net/save_net_{model.normalization_model}.ckpt")
+        factors, labels = get_factors(normalization_factor)
         print("批量预测")
         batch_xs, batch_ys, _ = get_batch_by_random(factors, labels)
         feed_dict = {
@@ -342,6 +345,7 @@ def predict(model: LSTMRNN):
 
 
 if __name__ == '__main__':
-    model = build_model()
-    # train(model)
-    predict(model)
+    normalization_factor, normalization_model = True, False
+    model = build_model(normalization_model)
+    train(model, normalization_factor)
+    predict(model, normalization_factor)
