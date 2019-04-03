@@ -20,27 +20,30 @@ import random
 BATCH_START = 0
 TIME_STEPS = 20
 BATCH_SIZE = 50
-INPUT_SIZE = 3
+INPUT_SIZE = 4
 OUTPUT_SIZE = 2
 CELL_SIZE = 10
 LR = 0.006
 TRAIN_COUNT = 1000
 
 
-def get_factors():
+def get_factors(norm=False):
     global INPUT_SIZE
     # '/home/mg/github/RefUtils/src/fh_tools/language_test/tensorflow_demo/research_demo/RU_continuous_adj.csv'
     file_path = r'RU_continuous_adj.csv'
     df = pd.read_csv(file_path, index_col=0)
     df = df[~df['close'].isnull()][['close', 'TermStructure', 'Volume', 'OI']]
 
-    factors = df.to_numpy()
+    factors = df.fillna(0).to_numpy()
     price_arr = factors[:, 0]
     INPUT_SIZE = factors.shape[1]
     labels = get_label_by_future_value(price_arr, -0.01, 0.01)
     idx_last_available_label = get_last_idx(labels, lambda x: x.sum() == 0)
     factors = factors[:idx_last_available_label + 1, :]
     labels = labels[:idx_last_available_label + 1, :]
+    if norm:
+        factors = (factors - np.mean(factors, 0)) / np.std(factors, 0)
+
     return factors, labels
 
 
@@ -164,6 +167,7 @@ class LSTMRNN:
             # tf Graph input
             self.xs = tf.placeholder(tf.float32, [None, n_step, n_inputs])
             self.ys = tf.placeholder(tf.float32, [None, n_classes])
+            self.is_training = tf.placeholder(tf.bool, [])
 
         # Define weights
         self.weights = {
@@ -200,21 +204,10 @@ class LSTMRNN:
         self.l_in_x = tf.reshape(self.xs, [-1, self.n_inputs])
         self.Ws_in = tf.Variable(tf.random_normal([self.n_inputs, self.n_hidden_units]))
         self.bs_in = tf.Variable(tf.constant(0.1, shape=[self.n_hidden_units, ]))
-
-        # batch normalization
-        with tf.name_scope('Normalize'):
-            # 一个特别小的数，保证分母不为0
-            epsilon = 1e-3
-            # batch_mean, batch_var = tf.nn.moments(l_in_y, [0])
-            self.batch_mean = tf.placeholder(tf.float32, [self.n_step, self.n_inputs])
-            self.batch_var = tf.placeholder(tf.float32, [self.n_step, self.n_inputs])
-            scale = tf.Variable(tf.ones([self.n_inputs]))
-            beta = tf.Variable(tf.zeros([self.n_inputs]))
-            l_in_x_bn = tf.nn.batch_normalization(self.l_in_x, self.batch_mean, self.batch_var, beta, scale, epsilon)
-
         # ==> X_in (128 batch * 28 steps, 128 hidden)
         with tf.name_scope('Wx_plus_b'):
-            l_in_y = tf.matmul(l_in_x_bn, self.Ws_in) + self.bs_in
+            l_in_y = tf.matmul(self.l_in_x, self.Ws_in) + self.bs_in
+            l_in_y = tf.layers.batch_normalization(l_in_y, training=self.is_training)
 
         # ==> X_in (128 batch, 28 steps, 128 hidden)
         self.l_in_y = tf.reshape(l_in_y, [-1, self.n_step, self.n_hidden_units])
@@ -242,19 +235,23 @@ class LSTMRNN:
         tf.summary.scalar('cost', self.cost)
 
 
-def train():
-    factors, labels = get_factors()
-    state = None
+def build_model():
     # hyperparameters
     lr = LR
-    training_iters = 100000
     batch_size = BATCH_SIZE
 
-    n_inputs = INPUT_SIZE  # MNIST data input (img shape 28*28)
-    n_step = TIME_STEPS  # time steps
+    n_inputs = INPUT_SIZE       # MNIST data input (img shape 28*28)
+    n_step = TIME_STEPS         # time steps
     n_hidden_units = CELL_SIZE  # neurons in hidden layer
-    n_classes = OUTPUT_SIZE  # MNIST classes (0-9 digits)
+    n_classes = OUTPUT_SIZE     # MNIST classes (0-9 digits)
     model = LSTMRNN(n_step, n_inputs, n_hidden_units, n_classes, lr, batch_size)
+    return model
+
+
+def train(model):
+    factors, labels = get_factors()
+    training_iters = 100000
+
     with tf.Session() as sess:
         merged = tf.summary.merge_all()
         writer = tf.summary.FileWriter('logs', sess.graph)
@@ -262,19 +259,13 @@ def train():
         # $ tensorboard --logdir='logs'
 
         sess.run(tf.global_variables_initializer())
-
-        # calc mean var
-        batch_mean, batch_var = tf.nn.moments(tf.cast(factors, tf.float32), [0])
-
         step = 0
         while step * model.batch_size < training_iters:
             # batch_xs, batch_ys = mnist.train.next_batch(model.batch_size)
             # batch_xs.shape, batch_ys.shape
-            # batch_xs, batch_ys, available_batch_size = get_batch(factors, labels)
             batch_xs, batch_ys, available_batch_size = get_batch_by_random(factors, labels)
             # print("available_batch_size", available_batch_size)
             if available_batch_size < model.batch_size:
-                print("available_batch_size=", available_batch_size, "退出训练")
                 break
             # batch_xs = batch_xs.reshape([model.batch_size, model.n_step, model.n_inputs])
             # feed_dict = {model.xs: batch_xs, model.ys: batch_ys}
@@ -282,9 +273,8 @@ def train():
             feed_dict = {
                 model.xs: batch_xs,
                 model.ys: batch_ys,
-                model.batch_mean: batch_mean,
-                model.batch_var: batch_var,
-                }
+                model.is_training: True,
+            }
 
             # sess.run(model.train_op, feed_dict=feed_dict)
             _, cost, state, pred = sess.run(
@@ -293,18 +283,18 @@ def train():
             )
 
             if step % 20 == 0:
-                # batch_xs, batch_ys, _ = get_batch(factors, labels)
-                #     feed_dict = {
-                #         model.xs: batch_xs,
-                #         model.ys: batch_ys,
-                #         # create initial state
-                #     }
-                print(sess.run(model.accuracy_op, feed_dict=feed_dict))
+                train_accuracy = np.mean(np.argmax(pred, 1) == np.argmax(batch_ys, 1))
+                batch_xs, batch_ys, _ = get_batch_by_random(factors, labels)
+                feed_dict = {
+                    model.xs: batch_xs,
+                    model.ys: batch_ys,
+                    model.is_training: True,
+                    # TODO: model.is_training should be False
+                }
+                test_accuracy = sess.run(model.accuracy_op, feed_dict=feed_dict)
+                print('train:', train_accuracy, 'test:', test_accuracy)
                 result = sess.run(merged, feed_dict)
                 writer.add_summary(result, step)
-
-            if step >= TRAIN_COUNT:
-                break
 
             step += 1
 
@@ -320,15 +310,13 @@ def predict(model: LSTMRNN):
     with tf.Session() as sess:
         saver.restore(sess, r"my_net/save_net.ckpt")
         factors, labels = get_factors()
-        # calc mean var
-        batch_mean, batch_var = tf.nn.moments(factors, [0])
         print("批量预测")
-        batch_xs, batch_ys, _ = get_batch(factors, labels)
+        batch_xs, batch_ys, _ = get_batch_by_random(factors, labels)
         feed_dict = {
             model.xs: batch_xs,
             model.ys: batch_ys,
-            model.batch_mean: batch_mean,
-            model.batch_var: batch_var,
+            model.is_training: True,
+            # TODO: model.is_training should be False
         }
         pred = sess.run(tf.argmax(model.pred, 1), feed_dict)
         print("pred:\n", pred)
@@ -336,14 +324,14 @@ def predict(model: LSTMRNN):
         print("accuracy: %.2f%%" % (sum(pred == np.argmax(batch_ys, axis=1)) / len(pred) * 100))
 
         print("独立样本预测")
-        batch_xs, batch_ys, available_batch_size = get_batch(factors, labels)
+        batch_xs, batch_ys, available_batch_size = get_batch_by_random(factors, labels)
         pred_all = []
         for n in range(available_batch_size):
             feed_dict = {
                 model.xs: batch_xs[n:n+1, :, :],
                 model.ys: batch_ys[n:n+1, :],
-                model.batch_mean: batch_mean,
-                model.batch_var: batch_var,
+                model.is_training: True,
+                # TODO: model.is_training should be False
             }
             pred = sess.run(tf.argmax(model.pred, 1), feed_dict)
             pred_all.extend(pred)
@@ -354,5 +342,6 @@ def predict(model: LSTMRNN):
 
 
 if __name__ == '__main__':
-    model = train()
+    model = build_model()
+    # train(model)
     predict(model)
