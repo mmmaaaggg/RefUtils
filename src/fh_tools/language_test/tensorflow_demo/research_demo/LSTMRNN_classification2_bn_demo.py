@@ -246,19 +246,16 @@ def train():
             )
 
             if step % 20 == 0:
-                # batch_xs, batch_ys, _ = get_batch()
-                #     feed_dict = {
-                #         model.xs: batch_xs,
-                #         model.ys: batch_ys,
-                #         # create initial state
-                #     }
+                train_accuracy = np.mean(np.argmax(pred, 1) == np.argmax(batch_ys, 1))
+                batch_xs, batch_ys, _ = get_batch(factors, labels)
                 feed_dict = {
                     model.xs: batch_xs,
                     model.ys: batch_ys,
                     model.is_training: True,
                     # TODO: model.is_training should be False
                 }
-                print(sess.run(model.accuracy_op, feed_dict=feed_dict))
+                test_accuracy = sess.run(model.accuracy_op, feed_dict=feed_dict)
+                print('train:', train_accuracy, 'test:', test_accuracy)
                 result = sess.run(merged, feed_dict)
                 writer.add_summary(result, step)
 
