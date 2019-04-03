@@ -32,9 +32,9 @@ def get_factors():
     factors = np.zeros((BATCH_SIZE * TIME_STEPS * multiple, INPUT_SIZE))
     # + 100 后出现分类预测无法计算的问，主要是由于数值过大造成梯度爆炸或梯度消失问题
     # 解决方案是将其进行 batch normalization
-    factors[:, 0] = np.sin(i_s) + 100                  # sin(x)
+    factors[:, 0] = np.sin(i_s) * 100 + 10000          # sin(x)
     factors[:, 1] = np.sin(i_s - 0.5) + 100            # sin(x-0.5)
-    factors[:, 2] = price_arr = np.cos(i_s) + 5              # cos(x) + 5
+    factors[:, 2] = price_arr = np.cos(i_s) + 5        # cos(x) + 5
     labels = get_label_by_future_value(price_arr, -0.1, 0.1)
     idx_last_available_label = get_last_idx(labels, lambda x: x.sum() == 0)
     factors = factors[:idx_last_available_label + 1, :]
@@ -210,10 +210,10 @@ def train():
     training_iters = 100000
     batch_size = BATCH_SIZE
 
-    n_inputs = INPUT_SIZE  # MNIST data input (img shape 28*28)
-    n_step = TIME_STEPS  # time steps
+    n_inputs = INPUT_SIZE       # MNIST data input (img shape 28*28)
+    n_step = TIME_STEPS         # time steps
     n_hidden_units = CELL_SIZE  # neurons in hidden layer
-    n_classes = OUTPUT_SIZE  # MNIST classes (0-9 digits)
+    n_classes = OUTPUT_SIZE     # MNIST classes (0-9 digits)
     model = LSTMRNN(n_step, n_inputs, n_hidden_units, n_classes, lr, batch_size)
     with tf.Session() as sess:
         merged = tf.summary.merge_all()
