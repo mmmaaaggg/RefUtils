@@ -3,7 +3,7 @@
 Created on 2017/7/19
 @author: MG
 """
-from threadpool import ThreadPool, makeRequests
+from threadpool import ThreadPool, makeRequests  # 此方法已经不推荐使用
 import time
 
 
