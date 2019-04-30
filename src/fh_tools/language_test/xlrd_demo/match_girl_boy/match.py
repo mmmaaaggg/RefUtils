@@ -5,7 +5,7 @@
 @Time    : 2019/3/15 10:37
 @File    : match.py
 @contact : mmmaaaggg@163.com
-@desc    : 
+@desc    : 针对阳君（苏玉洁）的朋友做的男女配对反向匹配的功能
 """
 import pandas as pd
 
