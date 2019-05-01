@@ -19,8 +19,11 @@ def get_best(df):
         code = df.iloc[i, 1]
         favor_code = set(df.iloc[i, 2:3])
         gender_dic[code] = df.iloc[i, 0]
-        if '(空)' in favor_code:
-            favor_code.remove('(空)')
+        # 剔除无效code
+        for tmp_code in list(favor_code):
+            if is_invalid_code(tmp_code):
+                favor_code.remove(tmp_code)
+
         favor_dic[code] = favor_code
 
     matched_pair_list = []
@@ -31,7 +34,7 @@ def get_best(df):
             if code in favor_dic[code_pair]:
                 matched_pair_list.append([gender_dic[code], code, gender_dic[code_pair], code_pair])
                 print('%d) %s %d <-> %s %d' % (
-                len(matched_pair_list), gender_dic[code], code, gender_dic[code_pair], code_pair))
+                    len(matched_pair_list), gender_dic[code], code, gender_dic[code_pair], code_pair))
 
     if len(matched_pair_list) == 0:
         print('没有结果')
@@ -47,8 +50,11 @@ def get_favor(df):
         code = df.iloc[i, 1]
         favor_code = set(df.iloc[i, 2:])
         gender_dic[code] = df.iloc[i, 0]
-        if '(空)' in favor_code:
-            favor_code.remove('(空)')
+        # 剔除无效code
+        for tmp_code in list(favor_code):
+            if is_invalid_code(tmp_code):
+                favor_code.remove(tmp_code)
+
         favor_dic[code] = favor_code
 
     matched_pair_list = []
@@ -81,9 +87,11 @@ def get_chosen(df):
     gender_dic = {}
     for i in range(df.shape[0]):
         code = df.iloc[i, 1]
+        if is_invalid_code(code):
+            continue
         gender_dic[code] = df.iloc[i, 0]
         for favor_code in list(df.iloc[i, 2:]):
-            if '(空)' == favor_code:
+            if is_invalid_code(favor_code):
                 continue
             if favor_code not in chosen_dic:
                 chosen_dic[favor_code] = []
@@ -95,8 +103,9 @@ def get_chosen(df):
         # print("%d) %d[%s] 被 %d 人喜欢：%s" % (num, chosen_code, gender, len(code_list), code_list))
 
     df_chosen = pd.DataFrame([
-        [chosen_code, gender_dic[chosen_code] if chosen_code in gender_dic else '', len(code_list)]
-        for num, (chosen_code, code_list) in enumerate(chosen_dic.items())],
+        [int(chosen_code), gender_dic[chosen_code] if chosen_code in gender_dic else '', len(code_list)]
+        for num, (chosen_code, code_list) in enumerate(chosen_dic.items())
+        if not is_invalid_code(chosen_code)],
         columns=["编号", "性别", "被选择的次数"]
     )
 
@@ -104,6 +113,7 @@ def get_chosen(df):
     for num, (_, chosen_s) in enumerate(df_chosen.T.items(), start=1):
         chosen_code = chosen_s["编号"]
         code_list = chosen_dic[chosen_code]
+        code_list.sort()
         gender = gender_dic[chosen_code] if chosen_code in gender_dic else ''
         print("%d) %d[%s] 被 %d 人喜欢编号列表：%s" % (num, chosen_code, gender, len(code_list), code_list))
 
@@ -119,7 +129,7 @@ def get_most_chosen(df):
         code = df.iloc[i, 1]
         gender_dic[code] = df.iloc[i, 0]
         for favor_code in list(df.iloc[i, 2:]):
-            if '(空)' == favor_code:
+            if is_invalid_code(favor_code):
                 continue
             if favor_code not in chosen_dic:
                 chosen_dic[favor_code] = []
@@ -132,7 +142,8 @@ def get_most_chosen(df):
 
     df_chosen = pd.DataFrame([
         [chosen_code, gender_dic[chosen_code] if chosen_code in gender_dic else '', len(code_list)]
-        for num, (chosen_code, code_list) in enumerate(chosen_dic.items())],
+        for num, (chosen_code, code_list) in enumerate(chosen_dic.items())
+        if not is_invalid_code(chosen_code)],
         columns=["编号", "性别", "被选择的次数"]
     )
     df_chosen.sort_values("被选择的次数", ascending=False, inplace=True)
@@ -144,11 +155,22 @@ def get_most_chosen(df):
     return df_chosen
 
 
+def is_invalid_code(code):
+    return (str(code).find('空') != -1) or (str(code).find('无') != -1)
+
+
 if __name__ == "__main__":
-    df = pd.read_excel(r'C:\GitHub\RefUtils\src\fh_tools\language_test\xlrd_demo\match_girl_boy\提交结果_final.xlsx')
+    df = pd.read_excel(
+        r'C:\GitHub\RefUtils\src\fh_tools\language_test\xlrd_demo\match_girl_boy\提交结果_final_190430_v2.xls')
+    # 1、互为对方第一选择的男、女编号（如有）
     best_match = get_best(df)
+    # 2、互为对方选择的男、女编号
     favor_match = get_favor(df)
-    favor_match.to_excel(r'C:\GitHub\RefUtils\src\fh_tools\language_test\xlrd_demo\match_girl_boy\favor_match.xls', index=False)
+    favor_match.to_excel(r'C:\GitHub\RefUtils\src\fh_tools\language_test\xlrd_demo\match_girl_boy\favor_match.xls',
+                         index=False)
+    # 3、每个人都被哪些人选择：
     chosen_dic = get_chosen(df)
+    # 4、被异性选择最多的男、女编号：
     df_chosen = get_most_chosen(df)
-    df_chosen.to_excel(r'C:\GitHub\RefUtils\src\fh_tools\language_test\xlrd_demo\match_girl_boy\favor_chosen.xls', index=False)
+    df_chosen.to_excel(r'C:\GitHub\RefUtils\src\fh_tools\language_test\xlrd_demo\match_girl_boy\favor_chosen.xls',
+                       index=False)
