@@ -34,8 +34,9 @@ def main(foo, init, **kwargs):
     if foo is None:
         print("None")
     else:
-        func_list[int(foo)]()
+        func_list[foo]()
 
 
 if __name__ == "__main__":
-    main(standalone_mode=False)
+    for _ in [1,2]:
+        main(standalone_mode=False)

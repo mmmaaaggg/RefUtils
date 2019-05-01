@@ -117,3 +117,5 @@ src/fh_tools/language_test/webscraping/OOOO*/config.ini
 # TensorFlow Example Files
 *-ubyte.gz
 events.out.tfevents.*
+*.ckpt.*
+checkpoint

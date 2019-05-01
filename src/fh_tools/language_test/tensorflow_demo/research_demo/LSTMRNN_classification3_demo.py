@@ -20,11 +20,31 @@ import random
 BATCH_START = 0
 TIME_STEPS = 20
 BATCH_SIZE = 50
-INPUT_SIZE = 3
+INPUT_SIZE = 4
 OUTPUT_SIZE = 2
 CELL_SIZE = 10
 LR = 0.006
-BATCH_START_TEST = 0
+TRAIN_COUNT = 1000
+
+
+def get_factors(norm=False):
+    global INPUT_SIZE
+    # '/home/mg/github/RefUtils/src/fh_tools/language_test/tensorflow_demo/research_demo/RU_continuous_adj.csv'
+    file_path = r'RU_continuous_adj.csv'
+    df = pd.read_csv(file_path, index_col=0)
+    df = df[~df['close'].isnull()][['close', 'TermStructure', 'Volume', 'OI']]
+
+    factors = df.fillna(0).to_numpy()
+    price_arr = factors[:, 0]
+    INPUT_SIZE = factors.shape[1]
+    labels = get_label_by_future_value(price_arr, -0.01, 0.01)
+    idx_last_available_label = get_last_idx(labels, lambda x: x.sum() == 0)
+    factors = factors[:idx_last_available_label + 1, :]
+    labels = labels[:idx_last_available_label + 1, :]
+    if norm:
+        factors = (factors - np.mean(factors, 0)) / np.std(factors, 0)
+
+    return factors, labels
 
 
 def get_label_by_future_value(value_arr: np.ndarray, min_pct: float, max_pct: float, max_future=None):
@@ -53,23 +73,6 @@ def get_label_by_future_value(value_arr: np.ndarray, min_pct: float, max_pct: fl
     return target_arr
 
 
-def get_factors():
-    global INPUT_SIZE
-    # '/home/mg/github/RefUtils/src/fh_tools/language_test/tensorflow_demo/research_demo/RU_continuous_adj.csv'
-    file_path = r'RU_continuous_adj.csv'
-    df = pd.read_csv(file_path, index_col=0)
-    df = df[~df['close'].isnull()][['close', 'TermStructure', 'Volume', 'OI']]
-
-    factors = df.to_numpy()
-    price_arr = factors[:, 0]
-    INPUT_SIZE = factors.shape[1]
-    labels = get_label_by_future_value(price_arr, -0.01, 0.01)
-    idx_last_available_label = get_last_idx(labels, lambda x: x.sum() == 0)
-    factors = factors[:idx_last_available_label + 1, :]
-    labels = labels[:idx_last_available_label + 1, :]
-    return factors, labels
-
-
 def get_batch(factors: np.ndarray, labels: np.ndarray, shift=2, show_plt=False):
     """
     够在一系列输入输出数据集
@@ -83,7 +86,7 @@ def get_batch(factors: np.ndarray, labels: np.ndarray, shift=2, show_plt=False):
     xs = np.zeros((BATCH_SIZE, TIME_STEPS, INPUT_SIZE))
     ys = np.zeros((BATCH_SIZE, OUTPUT_SIZE))
     available_batch_size, num = 0, 0
-    print(f"range({BATCH_START}, {factors.shape[0]}, {shift})")
+    # print(f"range({BATCH_START}, {factors.shape[0]}, {shift})")
     for available_batch_size, num in enumerate(range(BATCH_START, factors.shape[0], shift)):
         tmp = factors[num:num + TIME_STEPS, :]
         if tmp.shape[0] < TIME_STEPS:
@@ -135,7 +138,7 @@ def get_batch_by_random(factors: np.ndarray, labels: np.ndarray):
 
 
 class LSTMRNN:
-    def __init__(self, n_step, n_inputs, n_hidden_units, n_classes, lr, batch_size):
+    def __init__(self, n_step, n_inputs, n_hidden_units, n_classes, lr, batch_size, normalization_model):
         """
 
         :param n_step: time steps
@@ -145,6 +148,7 @@ class LSTMRNN:
         :param lr:
         :param training_iters:
         :param batch_size:
+        :param normalization_model:
         """
         self.n_step = n_step
         self.n_inputs = n_inputs
@@ -153,6 +157,7 @@ class LSTMRNN:
         # hyperparameters
         self.lr = lr
         self.batch_size = batch_size
+        self.normalization_model = normalization_model
         # attributes defined in other functions
         self.cost = None
         self.l_in_y = None
@@ -164,6 +169,7 @@ class LSTMRNN:
             # tf Graph input
             self.xs = tf.placeholder(tf.float32, [None, n_step, n_inputs])
             self.ys = tf.placeholder(tf.float32, [None, n_classes])
+            self.is_training = tf.placeholder(tf.bool, [])
 
         # Define weights
         self.weights = {
@@ -203,17 +209,17 @@ class LSTMRNN:
         # ==> X_in (128 batch * 28 steps, 128 hidden)
         with tf.name_scope('Wx_plus_b'):
             l_in_y = tf.matmul(self.l_in_x, self.Ws_in) + self.bs_in
+            if self.normalization_model:
+                l_in_y = tf.layers.batch_normalization(l_in_y, training=self.is_training)
+
         # ==> X_in (128 batch, 28 steps, 128 hidden)
         self.l_in_y = tf.reshape(l_in_y, [-1, self.n_step, self.n_hidden_units])
 
     def add_cell(self):
         # cell
         lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(self.n_hidden_units, forget_bias=1.0, state_is_tuple=True)
-        with tf.name_scope('initial_state'):
-            # lstm cell is divided into two parts (c_state, m_state)
-            self.cell_init_state = lstm_cell.zero_state(self.batch_size, dtype=tf.float32)
-
-        self.cell_outputs, self.cell_final_state = tf.nn.dynamic_rnn(lstm_cell, self.l_in_y, initial_state=self.cell_init_state, time_major=False)
+        self.cell_outputs, self.cell_final_state = tf.nn.dynamic_rnn(
+            lstm_cell, self.l_in_y, time_major=False, dtype=tf.float32)
 
     def add_output_layer(self):
         # hidden layer for output as the final results
@@ -232,19 +238,23 @@ class LSTMRNN:
         tf.summary.scalar('cost', self.cost)
 
 
-def train():
-    factors, labels = get_factors()
-    state = None
+def build_model(normalization_model):
     # hyperparameters
     lr = LR
-    training_iters = 100000
     batch_size = BATCH_SIZE
 
-    n_inputs = INPUT_SIZE  # MNIST data input (img shape 28*28)
-    n_step = TIME_STEPS  # time steps
+    n_inputs = INPUT_SIZE       # MNIST data input (img shape 28*28)
+    n_step = TIME_STEPS         # time steps
     n_hidden_units = CELL_SIZE  # neurons in hidden layer
-    n_classes = OUTPUT_SIZE  # MNIST classes (0-9 digits)
-    model = LSTMRNN(n_step, n_inputs, n_hidden_units, n_classes, lr, batch_size)
+    n_classes = OUTPUT_SIZE     # MNIST classes (0-9 digits)
+    model = LSTMRNN(n_step, n_inputs, n_hidden_units, n_classes, lr, batch_size, normalization_model)
+    return model
+
+
+def train(model, normalization_factor=False):
+    factors, labels = get_factors(normalization_factor)
+    training_iters = 100000
+
     with tf.Session() as sess:
         merged = tf.summary.merge_all()
         writer = tf.summary.FileWriter('logs', sess.graph)
@@ -256,27 +266,18 @@ def train():
         while step * model.batch_size < training_iters:
             # batch_xs, batch_ys = mnist.train.next_batch(model.batch_size)
             # batch_xs.shape, batch_ys.shape
-            # batch_xs, batch_ys, available_batch_size = get_batch(factors, labels)
-            batch_xs, batch_ys, available_batch_size = get_batch(factors, labels)
+            batch_xs, batch_ys, available_batch_size = get_batch_by_random(factors, labels)
             # print("available_batch_size", available_batch_size)
             if available_batch_size < model.batch_size:
-                print("available_batch_size=", available_batch_size, "退出训练")
                 break
             # batch_xs = batch_xs.reshape([model.batch_size, model.n_step, model.n_inputs])
             # feed_dict = {model.xs: batch_xs, model.ys: batch_ys}
             # sess.run(model.train_op, feed_dict=feed_dict)
-            if step == 0:
-                feed_dict = {
-                    model.xs: batch_xs,
-                    model.ys: batch_ys,
-                    # create initial state
-                }
-            else:
-                feed_dict = {
-                    model.xs: batch_xs,
-                    model.ys: batch_ys,
-                    model.cell_init_state: state,  # use last state as the initial state for this run
-                }
+            feed_dict = {
+                model.xs: batch_xs,
+                model.ys: batch_ys,
+                model.is_training: True,
+            }
 
             # sess.run(model.train_op, feed_dict=feed_dict)
             _, cost, state, pred = sess.run(
@@ -285,47 +286,66 @@ def train():
             )
 
             if step % 20 == 0:
-                # batch_xs, batch_ys, _ = get_batch(factors, labels)
-                # if step == 0:
-                #     feed_dict = {
-                #         model.xs: batch_xs,
-                #         model.ys: batch_ys,
-                #         # create initial state
-                #     }
-                # else:
-                #     feed_dict = {
-                #         model.xs: batch_xs,
-                #         model.ys: batch_ys,
-                #         model.cell_init_state: state,  # use last state as the initial state for this run
-                #     }
-                print(sess.run(model.accuracy_op, feed_dict=feed_dict))
+                train_accuracy = np.mean(np.argmax(pred, 1) == np.argmax(batch_ys, 1))
+                batch_xs, batch_ys, _ = get_batch_by_random(factors, labels)
+                feed_dict = {
+                    model.xs: batch_xs,
+                    model.ys: batch_ys,
+                    model.is_training: True,
+                    # TODO: model.is_training should be False
+                }
+                test_accuracy = sess.run(model.accuracy_op, feed_dict=feed_dict)
+                print('train:', train_accuracy, 'test:', test_accuracy)
                 result = sess.run(merged, feed_dict)
                 writer.add_summary(result, step)
 
             step += 1
 
         saver = tf.train.Saver()
-        save_path = saver.save(sess, r"my_net/save_net.ckpt")
+        save_path = saver.save(sess, f"my_net/save_net_{normalization_model}.ckpt")
         print("Save to path:", save_path)
-    return model, state
+    return model
 
 
-def predict(model: LSTMRNN, state):
+def predict(model: LSTMRNN, normalization_factor=False):
     print('开始预测')
     saver = tf.train.Saver()
     with tf.Session() as sess:
-        saver.restore(sess, r"my_net/save_net.ckpt")
-        factors, labels = get_factors()
-        batch_xs, batch_ys, _ = get_batch(factors, labels)
+        saver.restore(sess, f"my_net/save_net_{model.normalization_model}.ckpt")
+        factors, labels = get_factors(normalization_factor)
+        print("批量预测")
+        batch_xs, batch_ys, _ = get_batch_by_random(factors, labels)
         feed_dict = {
             model.xs: batch_xs,
             model.ys: batch_ys,
-            model.cell_init_state: state,  # use last state as the initial state for this run
+            model.is_training: True,
+            # TODO: model.is_training should be False
         }
-        pred = sess.run(model.pred, feed_dict)
-        print("pred:", pred)
+        pred = sess.run(tf.argmax(model.pred, 1), feed_dict)
+        print("pred:\n", pred)
+        print("batch_ys\n", np.argmax(batch_ys, axis=1))
+        print("accuracy: %.2f%%" % (sum(pred == np.argmax(batch_ys, axis=1)) / len(pred) * 100))
+
+        print("独立样本预测")
+        batch_xs, batch_ys, available_batch_size = get_batch_by_random(factors, labels)
+        pred_all = []
+        for n in range(available_batch_size):
+            feed_dict = {
+                model.xs: batch_xs[n:n+1, :, :],
+                model.ys: batch_ys[n:n+1, :],
+                model.is_training: True,
+                # TODO: model.is_training should be False
+            }
+            pred = sess.run(tf.argmax(model.pred, 1), feed_dict)
+            pred_all.extend(pred)
+
+        print("pred:\n", np.array(pred_all))
+        print("batch_ys\n", np.argmax(batch_ys, axis=1))
+        print("accuracy: %.2f%%" % (sum(pred_all == np.argmax(batch_ys, axis=1)) / len(pred_all) * 100))
 
 
 if __name__ == '__main__':
-    model, state = train()
-    # predict(model, state)
+    normalization_factor, normalization_model = True, False
+    model = build_model(normalization_model)
+    train(model, normalization_factor)
+    predict(model, normalization_factor)

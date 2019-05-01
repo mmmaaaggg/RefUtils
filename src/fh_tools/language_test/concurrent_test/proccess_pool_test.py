@@ -14,7 +14,7 @@ def fib(n, test_arg):
         raise Exception('can not > 30, now %s' % n)
     if n <= 2:
         return 1
-    return fib(n-1, test_arg) + fib(n-2, test_arg)
+    return fib(n - 1, test_arg) + fib(n - 2, test_arg)
 
 
 def use_submit():
@@ -26,6 +26,7 @@ def use_submit():
                 print('fib(%s) result is %s.' % (futures[f], f.result()))
             except Exception as e:
                 print(e)
+
 
 if __name__ == "__main__":
     use_submit()

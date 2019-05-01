@@ -3,7 +3,7 @@
 Created on 2017/7/19
 @author: MG
 """
-import threadpool
+import threadpool  # 此方法已经不推荐使用
 
 result_list = []
 

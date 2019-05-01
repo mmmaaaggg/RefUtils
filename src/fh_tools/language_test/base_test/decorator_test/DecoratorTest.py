@@ -9,4 +9,5 @@ def AMethod(name):
 
 
 # CheckMethod(AMethod)
+print('call AMethod')
 AMethod('abc')

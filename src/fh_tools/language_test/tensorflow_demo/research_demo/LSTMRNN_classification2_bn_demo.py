@@ -3,10 +3,9 @@
 """
 @author  : MG
 @Time    : 2019/03/19 16:09
-@File    : LSTMRNN_classification_demo.py
+@File    : LSTMRNN_classification2_1_demo.py
 @contact : mmmaaaggg@163.com
-@desc    : 输入双sin曲线，输出cos曲线未来波动是否可能超过 -0.1或 0.1
-根据一组输入（双sin曲线+cos曲线），将其按移动窗口分割成 batch_size 大小的训练集
+@desc    : 在 LSTMRNN_classification2_1_demo.py 的基础上增加 Batch Normalization
 """
 import tensorflow as tf
 import numpy as np
@@ -31,9 +30,11 @@ def get_factors():
     multiple = 100
     i_s = np.arange(BATCH_START, BATCH_START + TIME_STEPS * BATCH_SIZE * multiple)
     factors = np.zeros((BATCH_SIZE * TIME_STEPS * multiple, INPUT_SIZE))
-    factors[:, 0] = np.sin(i_s)                  # sin(x)
-    factors[:, 1] = np.sin(i_s - 0.5)            # sin(x-0.5)
-    factors[:, 2] = price_arr = np.cos(i_s) + 5              # cos(x) + 5
+    # + 100 后出现分类预测无法计算的问，主要是由于数值过大造成梯度爆炸或梯度消失问题
+    # 解决方案是将其进行 batch normalization
+    factors[:, 0] = np.sin(i_s) * 100 + 10000          # sin(x)
+    factors[:, 1] = np.sin(i_s - 0.5) + 100            # sin(x-0.5)
+    factors[:, 2] = price_arr = np.cos(i_s) + 5        # cos(x) + 5
     labels = get_label_by_future_value(price_arr, -0.1, 0.1)
     idx_last_available_label = get_last_idx(labels, lambda x: x.sum() == 0)
     factors = factors[:idx_last_available_label + 1, :]
@@ -134,6 +135,7 @@ class LSTMRNN:
             # tf Graph input
             self.xs = tf.placeholder(tf.float32, [None, n_step, n_inputs])
             self.ys = tf.placeholder(tf.float32, [None, n_classes])
+            self.is_training = tf.placeholder(tf.bool, [])
 
         # Define weights
         self.weights = {
@@ -173,17 +175,16 @@ class LSTMRNN:
         # ==> X_in (128 batch * 28 steps, 128 hidden)
         with tf.name_scope('Wx_plus_b'):
             l_in_y = tf.matmul(self.l_in_x, self.Ws_in) + self.bs_in
+            l_in_y = tf.layers.batch_normalization(l_in_y, training=self.is_training)
+
         # ==> X_in (128 batch, 28 steps, 128 hidden)
         self.l_in_y = tf.reshape(l_in_y, [-1, self.n_step, self.n_hidden_units])
 
     def add_cell(self):
         # cell
         lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(self.n_hidden_units, forget_bias=1.0, state_is_tuple=True)
-        with tf.name_scope('initial_state'):
-            # lstm cell is divided into two parts (c_state, m_state)
-            self.cell_init_state = lstm_cell.zero_state(self.batch_size, dtype=tf.float32)
-
-        self.cell_outputs, self.cell_final_state = tf.nn.dynamic_rnn(lstm_cell, self.l_in_y, initial_state=self.cell_init_state, time_major=False)
+        self.cell_outputs, self.cell_final_state = tf.nn.dynamic_rnn(
+            lstm_cell, self.l_in_y, time_major=False, dtype=tf.float32)
 
     def add_output_layer(self):
         # hidden layer for output as the final results
@@ -209,10 +210,10 @@ def train():
     training_iters = 100000
     batch_size = BATCH_SIZE
 
-    n_inputs = INPUT_SIZE  # MNIST data input (img shape 28*28)
-    n_step = TIME_STEPS  # time steps
+    n_inputs = INPUT_SIZE       # MNIST data input (img shape 28*28)
+    n_step = TIME_STEPS         # time steps
     n_hidden_units = CELL_SIZE  # neurons in hidden layer
-    n_classes = OUTPUT_SIZE  # MNIST classes (0-9 digits)
+    n_classes = OUTPUT_SIZE     # MNIST classes (0-9 digits)
     model = LSTMRNN(n_step, n_inputs, n_hidden_units, n_classes, lr, batch_size)
     with tf.Session() as sess:
         merged = tf.summary.merge_all()
@@ -232,18 +233,11 @@ def train():
             # batch_xs = batch_xs.reshape([model.batch_size, model.n_step, model.n_inputs])
             # feed_dict = {model.xs: batch_xs, model.ys: batch_ys}
             # sess.run(model.train_op, feed_dict=feed_dict)
-            if step == 0:
-                feed_dict = {
-                    model.xs: batch_xs,
-                    model.ys: batch_ys,
-                    # create initial state
-                }
-            else:
-                feed_dict = {
-                    model.xs: batch_xs,
-                    model.ys: batch_ys,
-                    model.cell_init_state: state,  # use last state as the initial state for this run
-                }
+            feed_dict = {
+                model.xs: batch_xs,
+                model.ys: batch_ys,
+                model.is_training: True,
+            }
 
             # sess.run(model.train_op, feed_dict=feed_dict)
             _, cost, state, pred = sess.run(
@@ -252,20 +246,16 @@ def train():
             )
 
             if step % 20 == 0:
-                # batch_xs, batch_ys, _ = get_batch()
-                # if step == 0:
-                #     feed_dict = {
-                #         model.xs: batch_xs,
-                #         model.ys: batch_ys,
-                #         # create initial state
-                #     }
-                # else:
-                #     feed_dict = {
-                #         model.xs: batch_xs,
-                #         model.ys: batch_ys,
-                #         model.cell_init_state: state,  # use last state as the initial state for this run
-                #     }
-                print(sess.run(model.accuracy_op, feed_dict=feed_dict))
+                train_accuracy = np.mean(np.argmax(pred, 1) == np.argmax(batch_ys, 1))
+                batch_xs, batch_ys, _ = get_batch(factors, labels)
+                feed_dict = {
+                    model.xs: batch_xs,
+                    model.ys: batch_ys,
+                    model.is_training: True,
+                    # TODO: model.is_training should be False
+                }
+                test_accuracy = sess.run(model.accuracy_op, feed_dict=feed_dict)
+                print('train:', train_accuracy, 'test:', test_accuracy)
                 result = sess.run(merged, feed_dict)
                 writer.add_summary(result, step)
 
@@ -274,10 +264,10 @@ def train():
         saver = tf.train.Saver()
         save_path = saver.save(sess, r"my_net/save_net.ckpt")
         print("Save to path:", save_path)
-    return model, state
+    return model
 
 
-def predict(model: LSTMRNN, state):
+def predict(model: LSTMRNN):
     print('开始预测')
     saver = tf.train.Saver()
     with tf.Session() as sess:
@@ -288,15 +278,33 @@ def predict(model: LSTMRNN, state):
         feed_dict = {
             model.xs: batch_xs,
             model.ys: batch_ys,
-            model.cell_init_state: state,  # use last state as the initial state for this run
+            model.is_training: True,
+            # TODO: model.is_training should be False
         }
         pred = sess.run(tf.argmax(model.pred, 1), feed_dict)
         print("pred:\n", pred)
         print("batch_ys\n", np.argmax(batch_ys, axis=1))
         print("accuracy: %.2f%%" % (sum(pred == np.argmax(batch_ys, axis=1)) / len(pred) * 100))
 
+        print("独立样本预测")
+        batch_xs, batch_ys, available_batch_size = get_batch(factors, labels)
+        pred_all = []
+        for n in range(available_batch_size):
+            feed_dict = {
+                model.xs: batch_xs[n:n+1, :, :],
+                model.ys: batch_ys[n:n+1, :],
+                model.is_training: True,
+                # TODO: model.is_training should be False
+            }
+            pred = sess.run(tf.argmax(model.pred, 1), feed_dict)
+            pred_all.extend(pred)
+
+        print("pred:\n", np.array(pred_all))
+        print("batch_ys\n", np.argmax(batch_ys, axis=1))
+        print("accuracy: %.2f%%" % (sum(pred_all == np.argmax(batch_ys, axis=1)) / len(pred_all) * 100))
+
 
 if __name__ == '__main__':
-    model, state = train()
+    model = train()
     BATCH_START = 0
-    predict(model, state)
+    predict(model)

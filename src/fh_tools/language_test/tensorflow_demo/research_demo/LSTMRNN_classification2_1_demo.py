@@ -3,9 +3,10 @@
 """
 @author  : MG
 @Time    : 2019/03/19 16:09
-@File    : LSTMRNN_classification_demo.py
+@File    : LSTMRNN_classification2_1_demo.py
 @contact : mmmaaaggg@163.com
-@desc    : 输入双sin曲线，输出cos曲线未来波动是否可能超过 -0.1或 0.1
+@desc    : 批量训练，独立样本预测分类（在 LSTMRNN_classification2_demo.py 的基础上增加 独立样本预测）
+输入双sin曲线，输出cos曲线未来波动是否可能超过 -0.1或 0.1
 根据一组输入（双sin曲线+cos曲线），将其按移动窗口分割成 batch_size 大小的训练集
 """
 import tensorflow as tf
@@ -179,11 +180,8 @@ class LSTMRNN:
     def add_cell(self):
         # cell
         lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(self.n_hidden_units, forget_bias=1.0, state_is_tuple=True)
-        with tf.name_scope('initial_state'):
-            # lstm cell is divided into two parts (c_state, m_state)
-            self.cell_init_state = lstm_cell.zero_state(self.batch_size, dtype=tf.float32)
-
-        self.cell_outputs, self.cell_final_state = tf.nn.dynamic_rnn(lstm_cell, self.l_in_y, initial_state=self.cell_init_state, time_major=False)
+        self.cell_outputs, self.cell_final_state = tf.nn.dynamic_rnn(
+            lstm_cell, self.l_in_y, time_major=False, dtype=tf.float32)
 
     def add_output_layer(self):
         # hidden layer for output as the final results
@@ -242,7 +240,6 @@ def train():
                 feed_dict = {
                     model.xs: batch_xs,
                     model.ys: batch_ys,
-                    model.cell_init_state: state,  # use last state as the initial state for this run
                 }
 
             # sess.run(model.train_op, feed_dict=feed_dict)
@@ -274,10 +271,10 @@ def train():
         saver = tf.train.Saver()
         save_path = saver.save(sess, r"my_net/save_net.ckpt")
         print("Save to path:", save_path)
-    return model, state
+    return model
 
 
-def predict(model: LSTMRNN, state):
+def predict(model: LSTMRNN):
     print('开始预测')
     saver = tf.train.Saver()
     with tf.Session() as sess:
@@ -288,15 +285,29 @@ def predict(model: LSTMRNN, state):
         feed_dict = {
             model.xs: batch_xs,
             model.ys: batch_ys,
-            model.cell_init_state: state,  # use last state as the initial state for this run
         }
         pred = sess.run(tf.argmax(model.pred, 1), feed_dict)
         print("pred:\n", pred)
         print("batch_ys\n", np.argmax(batch_ys, axis=1))
         print("accuracy: %.2f%%" % (sum(pred == np.argmax(batch_ys, axis=1)) / len(pred) * 100))
 
+        print("独立样本预测")
+        batch_xs, batch_ys, available_batch_size = get_batch(factors, labels)
+        pred_all = []
+        for n in range(available_batch_size):
+            feed_dict = {
+                model.xs: batch_xs[n:n+1, :, :],
+                model.ys: batch_ys[n:n+1, :],
+            }
+            pred = sess.run(tf.argmax(model.pred, 1), feed_dict)
+            pred_all.extend(pred)
+
+        print("pred:\n", np.array(pred_all))
+        print("batch_ys\n", np.argmax(batch_ys, axis=1))
+        print("accuracy: %.2f%%" % (sum(pred_all == np.argmax(batch_ys, axis=1)) / len(pred_all) * 100))
+
 
 if __name__ == '__main__':
-    model, state = train()
+    model = train()
     BATCH_START = 0
-    predict(model, state)
+    predict(model)
