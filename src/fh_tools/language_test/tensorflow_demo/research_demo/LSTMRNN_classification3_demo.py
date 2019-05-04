@@ -12,7 +12,7 @@ import tensorflow as tf
 import numpy as np
 # from tensorflow.examples.tutorials.mnist import input_data
 import matplotlib.pyplot as plt
-from src.fh_tools.fh_utils import get_last_idx
+from src.fh_tools.fh_utils import get_last_idx, get_folder_path
 import pandas as pd
 import random
 
@@ -29,12 +29,15 @@ TRAIN_COUNT = 1000
 
 def get_factors(norm=False):
     global INPUT_SIZE
+    import os
     # '/home/mg/github/RefUtils/src/fh_tools/language_test/tensorflow_demo/research_demo/RU_continuous_adj.csv'
-    file_path = r'RU_continuous_adj.csv'
+    file_name = r'RU ConInfoFull_Adj.csv'
+    folder_path = get_folder_path('research_demo', create_if_not_found=False)
+    file_path = os.path.join(folder_path, file_name)
     df = pd.read_csv(file_path, index_col=0)
-    df = df[~df['close'].isnull()][['close', 'TermStructure', 'Volume', 'OI']]
+    df = df[~df['Close'].isnull()][['Close', 'TermStructure', 'Volume', 'OI']]
 
-    factors = df.fillna(0).to_numpy()
+    factors = df.fillna(0).values
     price_arr = factors[:, 0]
     INPUT_SIZE = factors.shape[1]
     labels = get_label_by_future_value(price_arr, -0.01, 0.01)
