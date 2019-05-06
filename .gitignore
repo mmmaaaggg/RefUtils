@@ -118,4 +118,6 @@ src/fh_tools/language_test/webscraping/OOOO*/config.ini
 *-ubyte.gz
 events.out.tfevents.*
 *.ckpt.*
+*.ckpt-*
+imdb.pkl
 checkpoint
