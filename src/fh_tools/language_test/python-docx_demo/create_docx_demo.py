@@ -7,14 +7,13 @@
 @contact : mmmaaaggg@163.com
 @desc    : https://python-docx.readthedocs.io/en/latest/
 """
+import pandas as pd
 from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import qn
 from docx.shared import Inches
-from docx.dml.color import ColorFormat
 from docx.shared import Pt
 from docx.shared import RGBColor
-from docx.oxml.ns import qn
-from docx.enum.style import WD_STYLE_TYPE
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 
 def main():
@@ -104,8 +103,47 @@ def main():
     for r in range(rows_num):
         for c in range(cols_num):
             table.cell(r, c).text = "第{r}行{c}列".format(r=r + 1, c=c + 1)
+
+    document.add_paragraph('pd.DataFrame 生成表格')
+    df = pd.DataFrame({'a': [1, 2, 3], 'b': [2, 3, 4], 'c': [3, 4, 5], 'd': [4, 5, 6]})
+    df_2_table(document, df)
+
     # 保存文档
     document.save('Python生成的文档.docx')
+
+
+def df_2_table(doc, df):
+    row_num, col_num = df.shape
+    t = doc.add_table(row_num + 1, col_num)
+    t.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+
+    for j in range(col_num):
+        # t.cell(0, j).text = df.columns[j]
+        # paragraph = t.cell(0, j).add_paragraph()
+        paragraph = t.cell(0, j).paragraphs[0]
+        paragraph.add_run(df.columns[j]).bold = True
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    # format table style to be a grid
+    t.style = 'TableGrid'
+
+    # populate the table with the dataframe
+    for i in range(row_num):
+        for j in range(col_num):
+            # t.cell(i + 1, j).text = str(df.values[i, j])
+            paragraph = t.cell(i + 1, j).paragraphs[0]
+            paragraph.add_run(str(df.values[i, j])).bold = True
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+
+    # Highlight all cells limegreen (RGB 32CD32) if cell contains text "0.5"
+    from docx.oxml.ns import nsdecls
+    from docx.oxml import parse_xml
+
+    for i in range(1, row_num + 1):
+        for j in range(col_num):
+            if i % 2 == 0:
+                t.cell(i, j)._tc.get_or_add_tcPr().append(
+                    parse_xml(r'<w:shd {} w:fill="A3D9EA"/>'.format(nsdecls('w'))))
 
 
 if __name__ == '__main__':
