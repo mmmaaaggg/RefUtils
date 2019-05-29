@@ -121,3 +121,5 @@ events.out.tfevents.*
 *.ckpt-*
 imdb.pkl
 checkpoint
+src/fh_tools/language_test/tflearn_demo/17flowers/*
+*.npz
