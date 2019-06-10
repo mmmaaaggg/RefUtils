@@ -12,9 +12,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from pylab import mpl
 
-
+# mpl.rcParams['font.sans-serif'] = ['Microsoft YaHei']    # 指定默认字体：解决plot不能显示中文问题
 mpl.rcParams['font.sans-serif'] = ['Droid Sans Fallback']  # 字体可以根据需要改动
 mpl.rcParams['axes.unicode_minus'] = False  # 解决中文减号不显示的问题
-data_df = pd.DataFrame({"线段a": [1,2,3], '线段b': [3,2,1]})
+data_df = pd.DataFrame({"线段 a": [1, 2, 3], '线段 b': [3, 2, 1]})
 data_df.plot(title='中文标题')
 plt.show()
