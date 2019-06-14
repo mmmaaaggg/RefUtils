@@ -118,4 +118,8 @@ src/fh_tools/language_test/webscraping/OOOO*/config.ini
 *-ubyte.gz
 events.out.tfevents.*
 *.ckpt.*
+*.ckpt-*
+imdb.pkl
 checkpoint
+src/fh_tools/language_test/tflearn_demo/17flowers/*
+*.npz
