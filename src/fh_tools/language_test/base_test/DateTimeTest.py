@@ -63,3 +63,21 @@ def CheckDateInRange(DateList, CheckDate):
     return False
 
 print(CheckDateInRange(DateList, CheckDate))
+
+
+def counting_years(date_from_str, date_to_str):
+    # date_from_str, date_to_str = '2018-05-01', '2019-05-31'
+    date_from = datetime.strptime(date_from_str, '%Y-%m-%d')
+    date_to = datetime.strptime(date_to_str, '%Y-%m-%d')
+
+    year_start = datetime.strptime(f'{date_from.year}-01-01', '%Y-%m-%d')
+    year_end = datetime.strptime(f'{date_from.year}-12-31', '%Y-%m-%d')
+    ret_val1 = ((year_end - date_from).days + 1) / ((year_end - year_start).days + 1)
+
+    year_start = datetime.strptime(f'{date_to.year}-01-01', '%Y-%m-%d')
+    year_end = datetime.strptime(f'{date_to.year}-12-31', '%Y-%m-%d')
+    ret_val2 = ((date_to - year_start).days + 1) / ((year_end - year_start).days + 1)
+
+    ret_val = ret_val1 + ret_val2 + (date_to.year - date_from.year - 1)
+
+    return ret_val
