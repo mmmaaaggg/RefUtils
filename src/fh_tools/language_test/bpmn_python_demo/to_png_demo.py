@@ -7,6 +7,10 @@
 @contact : mmmaaaggg@163.com
 @desc    : 将 graph 输出为 图片
 there is a bug on Graphviz finding so we have to add PATH manually
+How to install bpmn-python?
+cd C:\GitHub\bpmn-python
+python setup.py sdist bdist_wheel
+pip install C:\GitHub\bpmn-python\dist\bpmn_python-0.0.19_SNAPSHOT-py3-none-any.whl
 """
 import os
 
