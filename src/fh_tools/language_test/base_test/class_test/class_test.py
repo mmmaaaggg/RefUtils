@@ -32,6 +32,7 @@ class C(A, B):
         # A.__init__(self)
         # B.__init__(self)
         super().__init__()
+        print('C')
 
 
 obj = C()
