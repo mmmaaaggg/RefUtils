@@ -147,21 +147,30 @@ def get_most_chosen(df):
         columns=["编号", "性别", "被选择的次数"]
     )
     df_chosen.sort_values("被选择的次数", ascending=False, inplace=True)
-    boy_favorate = df_chosen[df_chosen["性别"] == '男'].iloc[0, :]
-    girl_favorate = df_chosen[df_chosen["性别"] == '女'].iloc[0, :]
-    print('最受欢迎的男士，编号 %d 被 %d 人喜欢' % (boy_favorate["编号"], boy_favorate["被选择的次数"]))
-    print('最受欢迎的女士，编号 %d 被 %d 人喜欢' % (girl_favorate["编号"], girl_favorate["被选择的次数"]))
-    # print(df_chosen)
+    boy_favorate_df = df_chosen[df_chosen["性别"] == '男']
+    girl_favorate_df = df_chosen[df_chosen["性别"] == '女']
+    # boy_favorate = df_chosen[df_chosen["性别"] == '男'].iloc[0, :]
+    # girl_favorate = df_chosen[df_chosen["性别"] == '女'].iloc[0, :]
+    print('最受欢迎的前10男士\n编号\t被选择的次数')
+    # print(boy_favorate_df.head(10)[["编号", "被选择的次数"]])
+    for _, item in boy_favorate_df.head(10).T.items():
+        print(f"{int(item['编号'])}\t\t{item['被选择的次数']}")
+    # print('最受欢迎的女士，编号 %d 被 %d 人喜欢' % (girl_favorate["编号"], girl_favorate["被选择的次数"]))
+    print('最受欢迎的前10女士\n编号\t被选择的次数')
+    # print(girl_favorate_df.head(10)[["编号", "被选择的次数"]])
+    for _, item in girl_favorate_df.head(10).T.items():
+        print(f"{int(item['编号'])}\t\t{item['被选择的次数']}")
+
     return df_chosen
 
 
 def is_invalid_code(code):
-    return (str(code).find('空') != -1) or (str(code).find('无') != -1)
+    return pd.isna(code) or (str(code).find('空') != -1) or (str(code).find('无') != -1)
 
 
 if __name__ == "__main__":
     df = pd.read_excel(
-        r'C:\GitHub\RefUtils\src\fh_tools\language_test\xlrd_demo\match_girl_boy\提交结果_final_190430_v2.xls')
+        r'C:\GitHub\RefUtils\src\fh_tools\language_test\xlrd_demo\match_girl_boy\19端午500人线上结果表单（原始）.xls')
     # 1、互为对方第一选择的男、女编号（如有）
     best_match = get_best(df)
     # 2、互为对方选择的男、女编号

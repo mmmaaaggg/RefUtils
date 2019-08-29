@@ -10,12 +10,12 @@
 
 
 def check_func():
-    print('check before call')
+    print('call check_func')
     return True
 
 
 def check_before_run(func):
-
+    print('call check_before_run')
     def func_warpper(f):
 
         def call_func(*args, **kwargs):
@@ -34,9 +34,9 @@ def check_before_run(func):
 
 @check_before_run(check_func)
 def AMethod(name):
-    print('run AMethod', name)
+    print('call AMethod ->', name)
 
 
 if __name__ == "__main__":
-    print('call AMethod')
+    print('begin to call AMethod')
     AMethod('abc')
