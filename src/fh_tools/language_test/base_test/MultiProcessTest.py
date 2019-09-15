@@ -9,11 +9,12 @@
 """
 
 import time
+from datetime import datetime
 from multiprocessing import Pool, context
 
 
 def f(x):
-    print('x is %d' % x)
+    print('x is %d, %s' % (x, datetime.now()))
     time.sleep(1)
     return x * x
 
@@ -21,8 +22,14 @@ def f(x):
 if __name__ == '__main__':
     pool = Pool(processes=4)  # start 4 worker processes
 
-    result = pool.apply_async(f, (10,))  # evaluate "f(10)" asynchronously in a single process
-    print('result.get(timeout=3)', result.get(timeout=3))  # prints "100" unless your computer is *very* slow
+    result0 = pool.apply_async(f, (10,))  # evaluate "f(10)" asynchronously in a single process
+    result = pool.apply_async(f, (11,))  # evaluate "f(10)" asynchronously in a single process
+    result = pool.apply_async(f, (12,))  # evaluate "f(10)" asynchronously in a single process
+    result = pool.apply_async(f, (13,))  # evaluate "f(10)" asynchronously in a single process
+    result = pool.apply_async(f, (14,))  # evaluate "f(10)" asynchronously in a single process
+    result = pool.apply_async(f, (15,))  # evaluate "f(10)" asynchronously in a single process
+    print('result.get(timeout=3)', result0.get(timeout=3))  # prints "100" unless your computer is *very* slow
+
 
     print('pool.map(f, list(range(10)))', pool.map(f, list(range(10))))  # prints "[0, 1, 4,..., 81]"
 
@@ -30,6 +37,7 @@ if __name__ == '__main__':
     print('next(it)', next(it))  # prints "0"
     print('next(it)', next(it))  # prints "1"
     print('it.next(timeout=1)', it.next(timeout=1))  # prints "4" unless your computer is *very* slow
+
 
     try:
         result = pool.apply_async(time.sleep, (10,))
