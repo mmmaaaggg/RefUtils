@@ -10,6 +10,7 @@
 
 
 def yield_loop(n):
+    print('start loop')
     for x in range(n):
         yield x * 2
     print('loop finished')
