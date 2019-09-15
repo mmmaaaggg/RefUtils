@@ -9,9 +9,9 @@ import talib
 
 def fix_data(path):
     tmp = pd.read_csv(path, encoding="gbk", engine='python')
-    tmp.rename(columns={'Unnamed: 0':'trading_time'}, inplace=True)
-    tmp['trading_point'] = pd.to_datetime(tmp.trading_time)
-    del tmp['trading_time']
+    # tmp.rename(columns={'Unnamed: 0':'trading_time'}, inplace=True)
+    tmp['trading_point'] = pd.to_datetime(tmp.trade_date)
+    del tmp['trade_date']
     tmp.set_index(tmp.trading_point, inplace=True)
     return tmp
 
@@ -36,7 +36,7 @@ def High_2_Low(tmp, freq):
     tmp_price = pd.concat([tmp_open, tmp_high, tmp_low, tmp_close], axis=1)
     
     # 处理成交量
-    tmp_volume = tmp['volume'].resample(freq).sum()
+    tmp_volume = tmp['vol'].resample(freq).sum()
     tmp_volume.dropna(inplace=True)
     
     return pd.concat([tmp_price, tmp_volume], axis=1)
@@ -211,9 +211,10 @@ def get_factors(index,
 
 
 # In[2]:
-
-tmp = fix_data('HS300.csv')
-tmp = High_2_Low(tmp, '5min')
+import os
+sep = os.path.sep
+tmp = fix_data(os.path.abspath(f'..{sep}..{sep}HS300.csv'))
+# tmp = High_2_Low(tmp, '5min')
 Dtmp = High_2_Low(tmp, '1d')
 
 Index = tmp.index
@@ -221,7 +222,7 @@ High = tmp.high.values
 Low = tmp.low.values
 Close = tmp.close.values
 Open = tmp.open.values
-Volume = tmp.volume.values
+Volume = tmp.vol.values
 factors = get_factors(Index, Open, Close, High, Low, Volume, rolling = 188, drop=True)
 
 Dtmp['returns'] = np.log(Dtmp['close'].shift(-1)/Dtmp['close'])
@@ -238,6 +239,8 @@ for i in range(len(Dtmp)):
     s = i * 50
     e = (i + 5) * 50
     f = np.array(factors.iloc[s:e])
+    if f.shape[0] < 250:
+        break
     flist.append(np.expand_dims(f, axis=0))
 
 fac_array = np.concatenate(flist, axis=0)
