@@ -5,9 +5,9 @@ def CheckMethod(f):
 
 @CheckMethod
 def AMethod(name):
-    print('run AMethod', name)
+    print('run a_foo', name)
 
 
-# CheckMethod(AMethod)
-print('call AMethod')
+# CheckMethod(a_foo)
+print('call a_foo')
 AMethod('abc')

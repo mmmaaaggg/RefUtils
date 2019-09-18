@@ -12,9 +12,9 @@
 def cor():
     data_list = []
     while True:
-        print('get data')
+        print('go', end='')
         x = yield
-        print('get data', x)
+        print(x)
         if x is None:
             break
         data_list.append(x)
@@ -29,7 +29,8 @@ def main():
     print('next(func)')
     next(func)
     try:
-        for x in range(4):
+        for x in range(3):
+            print('->', x)
             func.send(x)
 
         func.send(None)

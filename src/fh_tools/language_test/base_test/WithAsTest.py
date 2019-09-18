@@ -11,4 +11,5 @@ class WithTest:
 with WithTest() as wt:
     print('do somthine')
     raise Exception()
+
 print('end')

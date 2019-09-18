@@ -9,7 +9,8 @@ document = Document()
 # 加入不同等级的标题
 document.add_heading('Document Title', 0)
 document.add_heading(u'二级标题', 1)
-document.add_heading(u'二级标题', 2)
+run = document.add_heading('', 3)
+run.add_run('三级标题[删除线]').font.double_strike = True
 
 # 添加文本
 paragraph = document.add_paragraph(u'添加了文本')
@@ -32,7 +33,10 @@ run = paragraph.add_run(u'斜体、')
 run.italic = True
 
 # 设置粗体
-run = paragraph.add_run(u'粗体').bold = True
+run = paragraph.add_run(u'粗体、').bold = True
+
+# 设置删除线
+paragraph.add_run(u'删除线').font.double_strike = True
 
 # 增加引用
 document.add_paragraph('Intense quote', style='Intense Quote')
@@ -77,4 +81,4 @@ hdr_cells[2].text = 'aabs zfgf'
 document.add_page_break()
 
 # 保存文件
-document.save('demo.docx')
+document.save('python-docx_test.docx')

@@ -15,8 +15,9 @@ def check_func():
 
 
 def check_before_run(func):
-    print('call check_before_run')
-    def func_warpper(f):
+    print('call decorator')
+
+    def func_wrapper(f):
 
         def call_func(*args, **kwargs):
             is_ok = func()
@@ -29,14 +30,15 @@ def check_before_run(func):
 
         return call_func
 
-    return func_warpper
+    return func_wrapper
 
 
 @check_before_run(check_func)
-def AMethod(name):
-    print('call AMethod ->', name)
+def a_foo(name):
+    print('call a_foo ->', name)
 
 
 if __name__ == "__main__":
-    print('begin to call AMethod')
-    AMethod('abc')
+    print('call a_foo start')
+    a_foo('abc')
+    print('call a_foo end')
