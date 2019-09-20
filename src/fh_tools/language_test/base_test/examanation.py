@@ -26,5 +26,11 @@ def main():
     print('end')
 
 
+# def main():
+#     for _, x in enumerate('Hello World'):
+#         if _ % 3 == 0:
+#             print('%02d -> %s' % (_, x))
+
+
 if __name__ == "__main__":
     main()
