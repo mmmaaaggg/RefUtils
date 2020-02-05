@@ -93,6 +93,7 @@ def get_chosen(df):
             continue
         gender_dic[code] = df.iloc[i, 0]
         for favor_code in list(df.iloc[i, 2:]):
+            favor_code = favor_code
             if is_invalid_code(favor_code):
                 continue
             if favor_code not in chosen_dic:
@@ -100,9 +101,9 @@ def get_chosen(df):
 
             chosen_dic[favor_code].append(code)
 
-    for num, (chosen_code, code_list) in enumerate(chosen_dic.items()):
-        gender = gender_dic[chosen_code] if chosen_code in gender_dic else ''
-        # print("%d) %d[%s] 被 %d 人喜欢：%s" % (num, chosen_code, gender, len(code_list), code_list))
+    # for num, (chosen_code, code_list) in enumerate(chosen_dic.items()):
+    #     gender = gender_dic[chosen_code] if chosen_code in gender_dic else ''
+    #     print("%d) %d[%s] 被 %d 人喜欢：%s" % (num, chosen_code, gender, len(code_list), code_list))
 
     df_chosen = pd.DataFrame([
         [int(chosen_code), gender_dic[chosen_code] if chosen_code in gender_dic else '', len(code_list)]
@@ -117,7 +118,7 @@ def get_chosen(df):
         code_list = chosen_dic[chosen_code]
         code_list.sort()
         gender = gender_dic[chosen_code] if chosen_code in gender_dic else ''
-        print("%d) 编号 %s[%s] 被 %d 人喜欢编号列表：%s" % (num, str(chosen_code), gender, len(code_list), code_list))
+        print("%d) 编号 %s[%s] 被 %d 人喜欢编号列表：%s" % (num, chosen_code, gender, len(code_list), code_list))
 
     return chosen_dic
 
@@ -171,8 +172,8 @@ def is_invalid_code(code):
 
 
 if __name__ == "__main__":
-    folder_path = r'D:\WSPych\RefUtils\src\fh_tools\language_test\xlrd_demo\match_girl_boy'
-    df = pd.read_excel(os.path.join(folder_path, '2019-10-03.xls'))
+    folder_path = r'/home/mg/Downloads'
+    df = pd.read_excel(os.path.join(folder_path, '54282867 (copy).xls'), dtype=str)
     # 1、互为对方第一选择的男、女编号（如有）
     best_match = get_best(df)
     # 2、互为对方选择的男、女编号
