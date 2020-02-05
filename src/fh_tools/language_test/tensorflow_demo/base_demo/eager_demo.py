@@ -6,16 +6,21 @@
 @contact : mmmaaaggg@163.com
 @desc    : 
 """
-from __future__ import absolute_import, division, print_function
+from __future__ import absolute_import, division, print_function, unicode_literals
+import os
 import tensorflow as tf
-# tensorflow 2.0 开始 tensorflow.contrib 被放弃
-import tensorflow.contrib.eager as tfe
 
-tfe.enable_eager_execution()
+import cProfile
 
+# In Tensorflow 2.0, eager execution is enabled by default.
+tf.executing_eagerly()
 x = [[2.]]
 m = tf.matmul(x, x)
-print("hello, {}".format(m))  # => "hello, [[4.]]"
+print("hello, {}".format(m))
+
+a = tf.constant([[1, 2],
+                 [3, 4]])
+print(a)
 
 if __name__ == "__main__":
     pass
