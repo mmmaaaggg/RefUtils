@@ -11,7 +11,8 @@
 # from __future__ import print_function
 import numpy as np
 import tensorflow as tf
-from tensorflow_core.python.framework.errors_impl import InvalidArgumentError
+# 引用此句将导致 replay_buffer.as_dataset 执行异常
+# from tensorflow_core.python.framework.errors_impl import InvalidArgumentError
 from tf_agents.replay_buffers.tf_uniform_replay_buffer import TFUniformReplayBuffer
 from tf_agents.specs import tensor_spec
 
@@ -38,9 +39,9 @@ values_batched = tf.nest.map_structure(lambda t: tf.stack([t] * batch_size), val
 for _ in range(5):
     replay_buffer.add_batch(values_batched)
 
-sample = replay_buffer.get_next(sample_batch_size=10, num_steps=2)
+# sample = replay_buffer.get_next(sample_batch_size=10, num_steps=2)
 
-dataset = replay_buffer.as_dataset(sample_batch_size=4, num_steps=1)
+dataset = replay_buffer.as_dataset(sample_batch_size=10, num_steps=1)
 iterator = iter(dataset)
 print("Iterator trajectories:")
 trajectories = []
@@ -51,6 +52,9 @@ for _ in range(3):
 print(tf.nest.map_structure(lambda t: t.shape, trajectories))
 
 replay_buffer.gather_all()
+
+print("Trajectories from gather all:")
+print(tf.nest.map_structure(lambda t: t.shape, trajectories))
 
 if __name__ == "__main__":
     pass
