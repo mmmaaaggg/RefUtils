@@ -14,4 +14,5 @@ pytdx
 matplotlib
 pyecharts
 pyecharts_snapshot
+snapshot-selenium
 tensorflow
