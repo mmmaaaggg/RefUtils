@@ -7,13 +7,24 @@
 @contact : mmmaaaggg@163.com
 @desc    : 
 """
+from snapshot_selenium import snapshot as driver
 
-from pyecharts import Bar
+from pyecharts import options as opts
+from pyecharts.charts import Bar
+from pyecharts.render import make_snapshot
 
-attr = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-v1 = [2.0, 4.9, 7.0, 23.2, 25.6, 76.7, 135.6, 162.2, 32.6, 20.0, 6.4, 3.3]
-v2 = [2.6, 5.9, 9.0, 26.4, 28.7, 70.7, 175.6, 182.2, 48.7, 18.8, 6.0, 2.3]
-bar = Bar("Bar chart", "precipitation and evaporation one year")
-bar.add("precipitation", attr, v1, mark_line=["average"], mark_point=["max", "min"])
-bar.add("evaporation", attr, v2, mark_line=["average"], mark_point=["max", "min"])
-bar.render()
+
+def bar_chart() -> Bar:
+    c = (
+        Bar()
+        .add_xaxis(["衬衫", "毛衣", "领带", "裤子", "风衣", "高跟鞋", "袜子"])
+        .add_yaxis("商家A", [114, 55, 27, 101, 125, 27, 105])
+        .add_yaxis("商家B", [57, 134, 137, 129, 145, 60, 49])
+        .reversal_axis()
+        .set_series_opts(label_opts=opts.LabelOpts(position="right"))
+        .set_global_opts(title_opts=opts.TitleOpts(title="Bar-测试渲染图片"))
+    )
+    return c
+
+# 需要安装 snapshot-selenium 或者 snapshot-phantomjs
+make_snapshot(driver, bar_chart().render(), "bar.png")

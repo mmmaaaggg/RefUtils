@@ -8,9 +8,9 @@
 @desc    : 
 """
 
-from pyecharts import Line, Pie, Grid, configure
+from pyecharts.charts import Line, Pie, Grid
 
-configure(output_image=True)
+# configure(output_image=True)
 
 line = Line("折线图示例", width=1200)
 attr = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
