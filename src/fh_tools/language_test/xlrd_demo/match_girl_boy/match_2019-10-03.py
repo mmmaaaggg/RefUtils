@@ -172,8 +172,8 @@ def is_invalid_code(code):
 
 
 if __name__ == "__main__":
-    folder_path = r'/home/mg/Downloads'
-    df = pd.read_excel(os.path.join(folder_path, '54282867 (copy).xls'), dtype=str)
+    folder_path = r'C:\GitHub\RefUtils\src\fh_tools\language_test\xlrd_demo\match_girl_boy'
+    df = pd.read_excel(os.path.join(folder_path, '63237476_0_20年214线上活动 心仪异性编号提交表单_282_282.xlsx'), dtype=str)
     # 1、互为对方第一选择的男、女编号（如有）
     best_match = get_best(df)
     # 2、互为对方选择的男、女编号

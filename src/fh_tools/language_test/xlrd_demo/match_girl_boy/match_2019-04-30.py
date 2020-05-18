@@ -33,8 +33,7 @@ def get_best(df):
                 continue
             if code in favor_dic[code_pair]:
                 matched_pair_list.append([gender_dic[code], code, gender_dic[code_pair], code_pair])
-                print('%d) %s %d <-> %s %d' % (
-                    len(matched_pair_list), gender_dic[code], code, gender_dic[code_pair], code_pair))
+                print(f'{len(matched_pair_list)}) {gender_dic[code]} {code} <-> {gender_dic[code_pair]} {code_pair}')
 
     if len(matched_pair_list) == 0:
         print('没有结果')
@@ -112,10 +111,11 @@ def get_chosen(df):
     df_chosen.sort_values("编号", inplace=True)
     for num, (_, chosen_s) in enumerate(df_chosen.T.items(), start=1):
         chosen_code = chosen_s["编号"]
-        code_list = chosen_dic[chosen_code]
+        # 部分情况下 chosen_code 会被 df 从str自动转换为 int， 这里做一次兼容型设计
+        code_list = chosen_dic[chosen_code] if chosen_code in chosen_dic else chosen_dic[str(chosen_code)]
         code_list.sort()
         gender = gender_dic[chosen_code] if chosen_code in gender_dic else ''
-        print("%d) %d[%s] 被 %d 人喜欢编号列表：%s" % (num, chosen_code, gender, len(code_list), code_list))
+        print(f"{num}) 编号 {chosen_code}[{gender}] 被 {len(code_list)} 人喜欢，编号列表：{code_list}")
 
     return chosen_dic
 
@@ -147,19 +147,19 @@ def get_most_chosen(df):
         columns=["编号", "性别", "被选择的次数"]
     )
     df_chosen.sort_values("被选择的次数", ascending=False, inplace=True)
+    # boy_favorate_df = df_chosen[df_chosen["性别"] == 1]  # 1 == '男'
+    # girl_favorate_df = df_chosen[df_chosen["性别"] == 2]  # 2 == '女'
     boy_favorate_df = df_chosen[df_chosen["性别"] == '男']
     girl_favorate_df = df_chosen[df_chosen["性别"] == '女']
-    # boy_favorate = df_chosen[df_chosen["性别"] == '男'].iloc[0, :]
-    # girl_favorate = df_chosen[df_chosen["性别"] == '女'].iloc[0, :]
     print('最受欢迎的前10男士\n编号\t被选择的次数')
     # print(boy_favorate_df.head(10)[["编号", "被选择的次数"]])
     for _, item in boy_favorate_df.head(10).T.items():
-        print(f"{int(item['编号'])}\t\t{item['被选择的次数']}")
-    # print('最受欢迎的女士，编号 %d 被 %d 人喜欢' % (girl_favorate["编号"], girl_favorate["被选择的次数"]))
+        print(f"{item['编号']}\t\t{item['被选择的次数']}")
+    # print('最受欢迎的女士，编号 %d 被 %d 人喜欢' % (girl_favorate_df["编号"], girl_favorate_df["被选择的次数"]))
     print('最受欢迎的前10女士\n编号\t被选择的次数')
     # print(girl_favorate_df.head(10)[["编号", "被选择的次数"]])
     for _, item in girl_favorate_df.head(10).T.items():
-        print(f"{int(item['编号'])}\t\t{item['被选择的次数']}")
+        print(f"{item['编号']}\t\t{item['被选择的次数']}")
 
     return df_chosen
 
@@ -170,7 +170,7 @@ def is_invalid_code(code):
 
 if __name__ == "__main__":
     df = pd.read_excel(
-        r'C:\GitHub\RefUtils\src\fh_tools\language_test\xlrd_demo\match_girl_boy\19端午500人线上结果表单（原始）.xls')
+        r'C:\GitHub\RefUtils\src\fh_tools\language_test\xlrd_demo\match_girl_boy\76085705.xlsx')
     # 1、互为对方第一选择的男、女编号（如有）
     best_match = get_best(df)
     # 2、互为对方选择的男、女编号
