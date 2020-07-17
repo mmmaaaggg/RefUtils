@@ -17,12 +17,13 @@ def get_best(df):
     gender_dic = {}
     for i in range(df.shape[0]):
         code = df.iloc[i, 1]
+        if is_invalid_code(code):
+            continue
+        code = int(code)
         favor_code = set(df.iloc[i, 2:3])
         gender_dic[code] = df.iloc[i, 0]
         # 剔除无效code
-        for tmp_code in list(favor_code):
-            if is_invalid_code(tmp_code):
-                favor_code.remove(tmp_code)
+        favor_code = {int(tmp_code) for tmp_code in list(favor_code) if not is_invalid_code(tmp_code)}
 
         favor_dic[code] = favor_code
 
@@ -47,12 +48,13 @@ def get_favor(df):
     gender_dic = {}
     for i in range(df.shape[0]):
         code = df.iloc[i, 1]
+        if is_invalid_code(code):
+            continue
+        code = int(code)
         favor_code = set(df.iloc[i, 2:])
         gender_dic[code] = df.iloc[i, 0]
         # 剔除无效code
-        for tmp_code in list(favor_code):
-            if is_invalid_code(tmp_code):
-                favor_code.remove(tmp_code)
+        favor_code = {int(tmp_code) for tmp_code in list(favor_code) if not is_invalid_code(tmp_code)}
 
         favor_dic[code] = favor_code
 
@@ -88,10 +90,12 @@ def get_chosen(df):
         code = df.iloc[i, 1]
         if is_invalid_code(code):
             continue
+        code = int(code)
         gender_dic[code] = df.iloc[i, 0]
         for favor_code in list(df.iloc[i, 2:]):
             if is_invalid_code(favor_code):
                 continue
+            favor_code = int(favor_code)
             if favor_code not in chosen_dic:
                 chosen_dic[favor_code] = []
 
@@ -112,7 +116,13 @@ def get_chosen(df):
     for num, (_, chosen_s) in enumerate(df_chosen.T.items(), start=1):
         chosen_code = chosen_s["编号"]
         # 部分情况下 chosen_code 会被 df 从str自动转换为 int， 这里做一次兼容型设计
-        code_list = chosen_dic[chosen_code] if chosen_code in chosen_dic else chosen_dic[str(chosen_code)]
+        if chosen_code in chosen_dic:
+            code_list = chosen_dic[chosen_code]
+        elif str(chosen_code) in chosen_dic:
+            code_list = chosen_dic[str(chosen_code)]
+        else:
+            continue
+
         code_list.sort()
         gender = gender_dic[chosen_code] if chosen_code in gender_dic else ''
         print(f"{num}) 编号 {chosen_code}[{gender}] 被 {len(code_list)} 人喜欢，编号列表：{code_list}")
@@ -127,10 +137,14 @@ def get_most_chosen(df):
     gender_dic = {}
     for i in range(df.shape[0]):
         code = df.iloc[i, 1]
+        if is_invalid_code(code):
+            continue
+        code = int(code)
         gender_dic[code] = df.iloc[i, 0]
         for favor_code in list(df.iloc[i, 2:]):
             if is_invalid_code(favor_code):
                 continue
+            favor_code = int(favor_code)
             if favor_code not in chosen_dic:
                 chosen_dic[favor_code] = []
 
@@ -170,7 +184,7 @@ def is_invalid_code(code):
 
 if __name__ == "__main__":
     df = pd.read_excel(
-        r'C:\GitHub\RefUtils\src\fh_tools\language_test\xlrd_demo\match_girl_boy\76085705.xlsx')
+        r'C:\GitHub\RefUtils\src\fh_tools\language_test\xlrd_demo\match_girl_boy\20年端午北京上海300人线上活动互选结果.xlsx')
     # 1、互为对方第一选择的男、女编号（如有）
     best_match = get_best(df)
     # 2、互为对方选择的男、女编号
