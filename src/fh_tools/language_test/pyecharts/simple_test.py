@@ -7,6 +7,19 @@
 @contact : mmmaaaggg@163.com
 @desc    : 
 """
+from unittest import mock
+
+
+def get_chrome_driver():
+    from selenium import webdriver
+    options = webdriver.ChromeOptions()
+    options.add_argument("headless")
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-gpu')
+    options.add_argument('--disable-dev-shm-usage')
+    return webdriver.Chrome(options=options)
+
+
 from snapshot_selenium import snapshot as driver
 
 from pyecharts import options as opts
@@ -26,5 +39,7 @@ def bar_chart() -> Bar:
     )
     return c
 
-# 需要安装 snapshot-selenium 或者 snapshot-phantomjs
-make_snapshot(driver, bar_chart().render(), "bar.png")
+
+with mock.patch('snapshot_selenium.snapshot.get_chrome_driver', get_chrome_driver):
+    # 需要安装 snapshot-selenium 或者 snapshot-phantomjs
+    make_snapshot(driver, bar_chart().render(), "bar.png")
