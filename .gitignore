@@ -123,3 +123,9 @@ imdb.pkl
 checkpoint
 src/fh_tools/language_test/tflearn_demo/17flowers/*
 *.npz
+
+# temp files
+*.png
+*.docx
+*.pdf
+*.html
