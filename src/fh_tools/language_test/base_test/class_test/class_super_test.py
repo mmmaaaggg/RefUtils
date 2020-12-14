@@ -33,4 +33,5 @@ class D(B, C):
 
 
 D()
+print("*"*10)
 print(D.mro())
