@@ -82,7 +82,8 @@ def export_tables_and_send_email():
     file_path_list = [f'd:\github\quant_vnpy\scripts\output\各策略持仓状态_2021-01-25.csv']
     msg = build_email(from_mail, to_mail_list, subject, file_path_list)
 
-    password = '***'
+    # --- yvsqlyjpbhdmbghc ---
+    password = '888'
     send_email_qq(from_mail, to_mail_list, password, msg)
 
 
