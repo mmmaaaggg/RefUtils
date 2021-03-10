@@ -3,8 +3,6 @@
 Created on 2017/6/6
 @author: MG
 """
-from unittest import mock
-import unittest
 
 
 def add_and_multiply(x, y):
@@ -28,22 +26,6 @@ class MyTestCase(unittest.TestCase):
         y = 5
 
         addition, multiple = add_and_multiply(x, y)
-
-        self.assertEqual(8, addition)
-        self.assertEqual(15, multiple)
-
-
-class MyTestCase2(unittest.TestCase):
-    @mock.patch('fh_tools.language_test.mock_test.multiply_test.multiply')
-    def test_add_and_multiply(self, mock_multiply):
-        x = 3
-        y = 5
-
-        mock_multiply.return_value = 15
-
-        addition, multiple = add_and_multiply(x, y)
-
-        mock_multiply.assert_called_once_with(3, 5)
 
         self.assertEqual(8, addition)
         self.assertEqual(15, multiple)
